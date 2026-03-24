@@ -82,6 +82,15 @@ This matches the [plugin directory structure](https://github.com/anthropics/clau
 
 Root `.mcp.json` uses **`${CLAUDE_PLUGIN_ROOT}`**, which Claude Code sets when the directory is loaded **as a plugin**. If you open this folder as a normal project and rely on project-scoped MCP, either run with **`claude --plugin-dir .`** from the repo root or add a **user/project** MCP server manually (absolute path below).
 
+**Plugin skills** ([quickstart pattern](https://code.claude.com/docs/en/plugins.md#create-your-first-plugin))
+
+After `/reload-plugins`, namespaced slash skills are available:
+
+| Skill | Invocation | Purpose |
+|-------|------------|---------|
+| **setup** | `/socials-claude-code-plugin:setup` | User-triggered setup / troubleshooting checklist (`disable-model-invocation`). Optional text after the command is treated as a platform hint (`$ARGUMENTS`). |
+| **using-socials** | *(model-invoked)* | Agent Skill: when to use which **`socials_*`** MCP tool and in what order. |
+
 ## Claude Code (manual MCP)
 
 Add a **stdio** MCP server that runs Node against **`dist/index.js`** if you are not using the plugin. Same shape as Desktop; paths are machine-specific.
@@ -127,6 +136,9 @@ socials-claude-code-plugin/
 ├── .claude-plugin/
 │   └── plugin.json        # Claude Code plugin manifest
 ├── .mcp.json              # MCP server config for the plugin (${CLAUDE_PLUGIN_ROOT})
+├── skills/
+│   ├── setup/SKILL.md     # Slash skill — setup & troubleshooting
+│   └── using-socials/SKILL.md  # Agent Skill — MCP tool workflow
 ├── scripts/
 │   └── run-claude-mcp.sh  # Optional launcher for manual MCP (non-plugin) setups
 ├── src/
