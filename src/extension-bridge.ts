@@ -21,7 +21,7 @@ const BRIDGE_HOST = "127.0.0.1" as const; // IPv4 only — avoids :: vs localhos
 const PING_INTERVAL = 30000; // 30 seconds
 const REQUEST_TIMEOUT = 60000; // 60 seconds for generation requests
 
-/** Optional: set SOCIALS_MCP_RECLAIM_PORT=1 to SIGTERM listeners on BRIDGE_PORT before bind (stale socials-mcp). */
+/** Optional: set SOCIALS_MCP_RECLAIM_PORT=1 to SIGTERM listeners on BRIDGE_PORT before bind (stale Socials MCP server). */
 function tryReclaimBridgePort(port: number): void {
   if (process.env.SOCIALS_MCP_RECLAIM_PORT !== "1") return;
   try {

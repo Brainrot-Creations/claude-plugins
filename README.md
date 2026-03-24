@@ -1,8 +1,10 @@
-# socials-mcp
+# Socials Claude Code plugin
 
-A small **[Model Context Protocol](https://modelcontextprotocol.io/)** (MCP) server that connects **[Claude](https://www.anthropic.com/claude)** ([Desktop](https://claude.ai/download) or [Claude Code](https://docs.anthropic.com/en/docs/claude-code)) to the **[Socials](https://socials.brainrotcreations.com)** browser extension so Claude can help with X, LinkedIn, and Reddit in Chrome (or another supported browser).
+**`socials-claude-code-plugin`** — a **[Model Context Protocol](https://modelcontextprotocol.io/)** (MCP) server and **[Claude Code plugin](https://code.claude.com/docs/en/plugins.md)** that connects **[Claude](https://www.anthropic.com/claude)** ([Desktop](https://claude.ai/download) or [Claude Code](https://docs.anthropic.com/en/docs/claude-code)) to the **[Socials](https://socials.brainrotcreations.com)** browser extension so Claude can help with X, LinkedIn, and Reddit in Chrome (or another supported browser).
 
-This repo is meant to be **cloned or copied as its own GitHub project**: install dependencies, build once, point Claude at `dist/index.js`, turn on **Agent Mode** in Socials, and you’re set.
+The repo follows the same layout as [Anthropic’s official plugins](https://github.com/anthropics/claude-code/tree/main/plugins): `.claude-plugin/plugin.json` plus root `.mcp.json` so enabling the plugin starts the MCP server automatically. You can still run it as a plain stdio MCP server (Desktop or manual Claude Code config).
+
+**Former name:** this project used to be published as **`socials-mcp`**; the GitHub repository is now **`BrainrotCreations/socials-claude-code-plugin`**.
 
 ## What you need
 
@@ -16,8 +18,8 @@ This repo is meant to be **cloned or copied as its own GitHub project**: install
 ## Quick start
 
 ```bash
-git clone https://github.com/BrainrotCreations/socials-mcp.git
-cd socials-mcp
+git clone https://github.com/BrainrotCreations/socials-claude-code-plugin.git
+cd socials-claude-code-plugin
 npm install
 npm run build
 ```
@@ -47,7 +49,7 @@ If you **fork** this repo, update the `repository` and `bugs` fields in `package
   "mcpServers": {
     "socials": {
       "command": "node",
-      "args": ["/absolute/path/to/socials-mcp/dist/index.js"]
+      "args": ["/absolute/path/to/socials-claude-code-plugin/dist/index.js"]
     }
   }
 }
@@ -61,19 +63,38 @@ Optional env on the server entry:
 
 - **`SOCIALS_MCP_RECLAIM_PORT=1`** — If port `9847` is stuck by a stale process, this tries to clear listeners before binding (see source in `extension-bridge.ts`).
 
-## Claude Code
+## Claude Code (plugin)
 
-Add a **stdio** MCP server whose command runs Node against this **`dist/index.js`**. Exact steps depend on your Claude Code version (global config, project config, or CLI). Point it at the same path as in the Desktop example.
+This matches the [plugin directory structure](https://github.com/anthropics/claude-code/tree/main/plugins) (`plugin-name/.claude-plugin/plugin.json`, optional `commands/`, `agents/`, `skills/`, `hooks/`, **`.mcp.json`**).
 
-Example shape (adjust paths and config location per [Claude Code docs](https://docs.anthropic.com/en/docs/claude-code)):
+**Install**
+
+1. Clone or copy this repository (or add it as a [marketplace](https://code.claude.com/docs/en/plugin-marketplaces) entry if you publish one).
+2. In Claude Code, install the plugin (e.g. `/plugin`) or load it for a session without installing:
+
+   ```bash
+   claude --plugin-dir /absolute/path/to/socials-claude-code-plugin
+   ```
+
+3. Enable the **socials-claude-code-plugin** plugin. The bundled `.mcp.json` starts **`node ${CLAUDE_PLUGIN_ROOT}/dist/index.js`** with **`SOCIALS_MCP_RECLAIM_PORT=1`** (see [plugin MCP docs](https://code.claude.com/docs/en/plugins-reference.md#mcp-servers)).
+
+**Developing in this repo**
+
+Root `.mcp.json` uses **`${CLAUDE_PLUGIN_ROOT}`**, which Claude Code sets when the directory is loaded **as a plugin**. If you open this folder as a normal project and rely on project-scoped MCP, either run with **`claude --plugin-dir .`** from the repo root or add a **user/project** MCP server manually (absolute path below).
+
+## Claude Code (manual MCP)
+
+Add a **stdio** MCP server that runs Node against **`dist/index.js`** if you are not using the plugin. Same shape as Desktop; paths are machine-specific.
 
 ```json
 {
   "mcpServers": {
     "socials": {
-      "type": "stdio",
       "command": "node",
-      "args": ["/absolute/path/to/socials-mcp/dist/index.js"]
+      "args": ["/absolute/path/to/socials-claude-code-plugin/dist/index.js"],
+      "env": {
+        "SOCIALS_MCP_RECLAIM_PORT": "1"
+      }
     }
   }
 }
@@ -81,15 +102,15 @@ Example shape (adjust paths and config location per [Claude Code docs](https://d
 
 ## Optional: `npx` / global binary
 
-After `npm run build`, you can run the published binary name if `node_modules/.bin` is on your `PATH`:
+After `npm run build`, you can run the published binary if `node_modules/.bin` is on your `PATH`:
 
 ```bash
-npx socials-mcp
+npx socials-claude-code-plugin
 # or, from this directory after npm link:
-socials-mcp
+socials-claude-code-plugin
 ```
 
-Claude config would use `"command": "socials-mcp"` and `"args": []` only if the binary resolves correctly.
+Claude config can use `"command": "socials-claude-code-plugin"` and `"args": []` if the binary resolves on your `PATH`.
 
 ## Troubleshooting
 
@@ -102,12 +123,17 @@ Claude config would use `"command": "socials-mcp"` and `"args": []` only if the 
 ## Repo layout
 
 ```
-socials-mcp/
+socials-claude-code-plugin/
+├── .claude-plugin/
+│   └── plugin.json        # Claude Code plugin manifest
+├── .mcp.json              # MCP server config for the plugin (${CLAUDE_PLUGIN_ROOT})
+├── scripts/
+│   └── run-claude-mcp.sh  # Optional launcher for manual MCP (non-plugin) setups
 ├── src/
 │   ├── index.ts           # MCP tools + stdio entry
 │   ├── extension-bridge.ts # WebSocket bridge to the extension
 │   └── types.ts
-├── dist/                  # produced by `npm run build`
+├── dist/                  # produced by `npm run build` (commit for plugin installs without build)
 ├── package.json
 ├── tsconfig.json
 ├── LICENSE

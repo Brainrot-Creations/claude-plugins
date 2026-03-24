@@ -6,7 +6,6 @@ import { z } from "zod";
 import { ExtensionBridge } from "./extension-bridge.js";
 const bridge = new ExtensionBridge();
 // Tool schemas
-const CheckProAccessSchema = z.object({});
 const GetFeedPostsSchema = z.object({
     platform: z.enum(["x", "linkedin", "reddit"]).describe("Social media platform"),
     count: z.number().optional().default(10).describe("Number of posts to fetch (default: 10)"),
@@ -22,12 +21,6 @@ const GenerateReplySchema = z.object({
     persona_id: z.string().optional().describe("Persona ID to use for generation"),
     mood: z.string().optional().describe("Mood/tone for the reply (e.g., witty, professional)"),
 });
-const SubmitReplySchema = z.object({
-    platform: z.enum(["x", "linkedin", "reddit"]).describe("Social media platform"),
-    post_url: z.string().describe("URL of the post to reply to"),
-    reply_content: z.string().describe("Content of the reply to post"),
-});
-const ListPersonasSchema = z.object({});
 // Browser control schemas
 const OpenTabSchema = z.object({
     url: z.string().describe("URL to open in new tab"),
@@ -39,12 +32,9 @@ const NavigateToSchema = z.object({
 const ReloadTabSchema = z.object({
     tab_id: z.number().optional().describe("Tab ID to reload (uses active tab if not provided)"),
 });
-const CloseTabSchema = z.object({
-    tab_id: z.number().describe("Tab ID to close"),
-});
 // Create MCP server
 const server = new Server({
-    name: "socials-mcp",
+    name: "socials-claude-code-plugin",
     version: "1.0.0",
 }, {
     capabilities: {
@@ -283,7 +273,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                                     action: "The MCP WebSocket bridge is not listening on port 9847 (bridge failed to start or port is in use). " +
                                         "Fix: run `lsof -nP -iTCP:9847 | grep LISTEN`, quit duplicate Claude sessions or stale node processes, " +
                                         "or add env SOCIALS_MCP_RECLAIM_PORT=1 to this MCP server in Claude. " +
-                                        "Then restart Claude Code so socials-mcp starts cleanly.",
+                                        "Then restart Claude Code so the Socials plugin starts cleanly.",
                                 }),
                             },
                         ],
@@ -550,13 +540,13 @@ async function main() {
     // Start WebSocket bridge for extension communication
     try {
         await bridge.start();
-        console.error("[socials-mcp] Extension bridge started");
+        console.error("[socials-plugin] Extension bridge started");
     }
     catch (error) {
         const msg = error instanceof Error ? error.message : String(error);
-        console.error("[socials-mcp] Failed to start extension bridge:", msg);
+        console.error("[socials-plugin] Failed to start extension bridge:", msg);
         if (msg.includes("EADDRINUSE") || msg.includes("address already in use")) {
-            console.error("[socials-mcp] Another process holds port 9847 (often a stale socials-mcp). " +
+            console.error("[socials-plugin] Another process holds port 9847 (often a stale Socials MCP process). " +
                 "Fix: quit duplicate Claude windows, or run `lsof -nP -iTCP:9847 | grep LISTEN` and kill that PID. " +
                 "Optional: set env SOCIALS_MCP_RECLAIM_PORT=1 on this MCP server to SIGTERM listeners on 9847 before bind.");
         }
@@ -565,7 +555,7 @@ async function main() {
     // Start MCP server
     const transport = new StdioServerTransport();
     await server.connect(transport);
-    console.error("[socials-mcp] MCP server running");
+    console.error("[socials-plugin] MCP server running");
     // Handle shutdown
     process.on("SIGINT", () => {
         bridge.stop();
@@ -577,7 +567,7 @@ async function main() {
     });
 }
 main().catch((error) => {
-    console.error("[socials-mcp] Fatal error:", error);
+    console.error("[socials-plugin] Fatal error:", error);
     process.exit(1);
 });
 //# sourceMappingURL=index.js.map

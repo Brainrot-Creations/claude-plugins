@@ -1,11 +1,8 @@
 {
   "mcpServers": {
     "socials": {
-      "type": "stdio",
-      "command": "/bin/bash",
-      "args": [
-        "./scripts/run-claude-mcp.sh"
-      ],
+      "command": "node",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/dist/index.js"],
       "env": {
         "SOCIALS_MCP_RECLAIM_PORT": "1"
       }

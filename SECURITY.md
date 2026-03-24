@@ -2,7 +2,7 @@
 
 ## What this project does
 
-- **socials-mcp** runs on your computer and listens on **`127.0.0.1:9847`** for a single WebSocket client (the Socials browser extension).
+- **Socials Claude Code plugin** (npm: `socials-claude-code-plugin`) runs on your computer and listens on **`127.0.0.1:9847`** for a single WebSocket client (the Socials browser extension).
 - It does **not** ship API keys for your backend; the extension uses its own session with Socials services.
 
 ## Local trust model
@@ -14,7 +14,7 @@
 
 | Variable | Purpose |
 |----------|---------|
-| `SOCIALS_MCP_RECLAIM_PORT=1` | Optional. On startup, may send SIGTERM to processes listening on port 9847 (helps recover from stale `socials-mcp`). Use with care on shared machines. |
+| `SOCIALS_MCP_RECLAIM_PORT=1` | Optional. On startup, may send SIGTERM to processes listening on port 9847 (helps recover from a stale Socials MCP server). Use with care on shared machines. |
 | `SOCIALS_MCP_DEBUG=1` | Optional. If set, `socials_get_page_content` may include a `debug` field from the extension. Omit in normal use to avoid leaking verbose extension diagnostics into Claude. |
 
 ## Reporting issues

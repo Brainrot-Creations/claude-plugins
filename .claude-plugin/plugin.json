@@ -1,0 +1,21 @@
+{
+  "name": "socials-claude-code-plugin",
+  "version": "1.0.0",
+  "description": "Claude Code plugin: MCP server that connects Claude to the Socials browser extension (X, LinkedIn, Reddit) via Agent Mode and a local WebSocket bridge.",
+  "author": {
+    "name": "Brainrot Creations"
+  },
+  "homepage": "https://socials.brainrotcreations.com",
+  "repository": "https://github.com/BrainrotCreations/socials-claude-code-plugin",
+  "license": "MIT",
+  "keywords": [
+    "mcp",
+    "socials",
+    "browser-extension",
+    "x",
+    "linkedin",
+    "reddit",
+    "claude-code-plugin",
+    "socials-claude-code-plugin"
+  ]
+}

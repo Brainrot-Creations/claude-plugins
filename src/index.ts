@@ -47,7 +47,7 @@ const ReloadTabSchema = z.object({
 // Create MCP server
 const server = new Server(
   {
-    name: "socials-mcp",
+    name: "socials-claude-code-plugin",
     version: "1.0.0",
   },
   {
@@ -311,7 +311,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                     "The MCP WebSocket bridge is not listening on port 9847 (bridge failed to start or port is in use). " +
                     "Fix: run `lsof -nP -iTCP:9847 | grep LISTEN`, quit duplicate Claude sessions or stale node processes, " +
                     "or add env SOCIALS_MCP_RECLAIM_PORT=1 to this MCP server in Claude. " +
-                    "Then restart Claude Code so socials-mcp starts cleanly.",
+                    "Then restart Claude Code so the Socials plugin starts cleanly.",
                 }),
               },
             ],
@@ -614,13 +614,13 @@ async function main(): Promise<void> {
   // Start WebSocket bridge for extension communication
   try {
     await bridge.start();
-    console.error("[socials-mcp] Extension bridge started");
+    console.error("[socials-plugin] Extension bridge started");
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
-    console.error("[socials-mcp] Failed to start extension bridge:", msg);
+    console.error("[socials-plugin] Failed to start extension bridge:", msg);
     if (msg.includes("EADDRINUSE") || msg.includes("address already in use")) {
       console.error(
-        "[socials-mcp] Another process holds port 9847 (often a stale socials-mcp). " +
+        "[socials-plugin] Another process holds port 9847 (often a stale Socials MCP process). " +
           "Fix: quit duplicate Claude windows, or run `lsof -nP -iTCP:9847 | grep LISTEN` and kill that PID. " +
           "Optional: set env SOCIALS_MCP_RECLAIM_PORT=1 on this MCP server to SIGTERM listeners on 9847 before bind."
       );
@@ -631,7 +631,7 @@ async function main(): Promise<void> {
   // Start MCP server
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error("[socials-mcp] MCP server running");
+  console.error("[socials-plugin] MCP server running");
 
   // Handle shutdown
   process.on("SIGINT", () => {
@@ -646,6 +646,6 @@ async function main(): Promise<void> {
 }
 
 main().catch((error) => {
-  console.error("[socials-mcp] Fatal error:", error);
+  console.error("[socials-plugin] Fatal error:", error);
   process.exit(1);
 });
