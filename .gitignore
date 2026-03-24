@@ -1,0 +1,8 @@
+node_modules/
+.DS_Store
+*.log
+.env
+.env.*
+
+# Local Claude Desktop config — never commit your machine-specific paths
+claude_desktop_config.json

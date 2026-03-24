@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "socials": {
+      "command": "node",
+      "args": ["/absolute/path/to/socials-mcp/dist/index.js"],
+      "env": {
+        "SOCIALS_MCP_RECLAIM_PORT": "1"
+      }
+    }
+  }
+}

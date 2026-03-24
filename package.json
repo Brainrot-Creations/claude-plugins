@@ -1,0 +1,55 @@
+{
+  "name": "socials-mcp",
+  "version": "1.0.0",
+  "description": "Model Context Protocol (MCP) server for the Socials browser extension — use with Claude Desktop or Claude Code",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "socials-mcp": "./dist/index.js"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "claude",
+    "socials",
+    "browser-extension",
+    "x",
+    "linkedin",
+    "reddit"
+  ],
+  "homepage": "https://socials.brainrotcreations.com",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/BrainrotCreations/socials-mcp.git"
+  },
+  "bugs": {
+    "url": "https://github.com/BrainrotCreations/socials-mcp/issues"
+  },
+  "license": "MIT",
+  "files": [
+    "dist",
+    "src",
+    "README.md",
+    "LICENSE",
+    "SECURITY.md",
+    "claude_desktop_config.example.json"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "ws": "^8.16.0",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.5",
+    "@types/ws": "^8.5.10",
+    "typescript": "^5.3.3"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
