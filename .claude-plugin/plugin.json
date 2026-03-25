@@ -1,5 +1,5 @@
 {
-  "name": "socials-claude-code-plugin",
+  "name": "socials",
   "version": "1.0.0",
   "description": "Claude Code plugin: MCP server that connects Claude to the Socials browser extension (X, LinkedIn, Reddit) via a local WebSocket bridge (paid plans).",
   "author": {
@@ -15,7 +15,6 @@
     "x",
     "linkedin",
     "reddit",
-    "claude-code-plugin",
-    "socials-claude-code-plugin"
+    "claude-code-plugin"
   ]
 }

@@ -8,7 +8,7 @@ Clone https://github.com/BrainrotCreations/socials-claude-code-plugin, run npm i
 
 ---
 
-**`socials-claude-code-plugin`** — a **[Model Context Protocol](https://modelcontextprotocol.io/)** (MCP) server and **[Claude Code plugin](https://code.claude.com/docs/en/plugins.md)** that connects **[Claude](https://www.anthropic.com/claude)** ([Desktop](https://claude.ai/download) or [Claude Code](https://docs.anthropic.com/en/docs/claude-code)) to the **[Socials](https://socials.brainrotcreations.com)** browser extension so Claude can help with X, LinkedIn, and Reddit in Chrome (or another supported browser).
+**`socials`** — a **[Model Context Protocol](https://modelcontextprotocol.io/)** (MCP) server and **[Claude Code plugin](https://code.claude.com/docs/en/plugins.md)** that connects **[Claude](https://www.anthropic.com/claude)** ([Desktop](https://claude.ai/download) or [Claude Code](https://docs.anthropic.com/en/docs/claude-code)) to the **[Socials](https://socials.brainrotcreations.com)** browser extension so Claude can help with X, LinkedIn, and Reddit in Chrome (or another supported browser).
 
 The repo follows the same layout as [Anthropic’s official plugins](https://github.com/anthropics/claude-code/tree/main/plugins): `.claude-plugin/plugin.json` plus root `.mcp.json` so enabling the plugin starts the MCP server automatically. You can still run it as a plain stdio MCP server (Desktop or manual Claude Code config).
 
@@ -104,7 +104,7 @@ This matches the [plugin directory structure](https://github.com/anthropics/clau
    claude --plugin-dir /absolute/path/to/socials-claude-code-plugin
    ```
 
-3. Enable the **socials-claude-code-plugin** plugin. The bundled `.mcp.json` starts **`node ${CLAUDE_PLUGIN_ROOT}/dist/index.js`** with **`SOCIALS_MCP_RECLAIM_PORT=1`** (see [plugin MCP docs](https://code.claude.com/docs/en/plugins-reference.md#mcp-servers)).
+3. Enable the **socials** plugin. The bundled `.mcp.json` starts **`node ${CLAUDE_PLUGIN_ROOT}/dist/index.js`** with **`SOCIALS_MCP_RECLAIM_PORT=1`** (see [plugin MCP docs](https://code.claude.com/docs/en/plugins-reference.md#mcp-servers)).
 
 > **Note:** The `/plugin install` command expects a marketplace URL, not a GitHub URL. Use the clone method above for GitHub-hosted plugins.
 
@@ -118,11 +118,20 @@ After `/reload-plugins`, namespaced slash skills are available:
 
 | Skill | Invocation | Purpose |
 |-------|------------|---------|
-| **setup** | `/socials-claude-code-plugin:setup` | User-triggered setup / troubleshooting checklist (`disable-model-invocation`). Optional text after the command is treated as a platform hint (`$ARGUMENTS`). |
+| **setup** | `/socials:setup` | User-triggered setup / troubleshooting checklist (`disable-model-invocation`). Optional text after the command is treated as a platform hint (`$ARGUMENTS`). |
 | **using-socials** | *(model-invoked)* | Agent Skill: when to use which **`socials_*`** MCP tool and in what order. |
 | **engagement-workflow** | *(model-invoked)* | Agent Skill: find relevant posts and build an engagement routine for growth. |
 | **persona-guide** | *(model-invoked)* | Agent Skill: choose the right persona for content, understand system vs custom personas. |
 | **product-promotion** | *(model-invoked)* | Agent Skill: promote products authentically without being spammy, platform-specific rules. |
+
+**Plugin agents** (invoke with `@socials:agent`):
+
+| Agent | Purpose |
+|-------|---------|
+| **@socials:manager** | Full-service social media manager — creates content, posts, engages, and grows your audience. |
+| **@socials:creator** | Crafts engaging posts with your chosen persona and style. |
+| **@socials:engage** | Finds relevant posts and crafts thoughtful replies to grow your presence. |
+| **@socials:growth** | Creates growth strategies, content calendars, and optimization plans. |
 
 ## Claude Code (manual MCP)
 
@@ -147,12 +156,12 @@ Add a **stdio** MCP server that runs Node against **`dist/index.js`** if you are
 After `npm run build`, you can run the published binary if `node_modules/.bin` is on your `PATH`:
 
 ```bash
-npx socials-claude-code-plugin
+npx socials
 # or, from this directory after npm link:
-socials-claude-code-plugin
+socials
 ```
 
-Claude config can use `"command": "socials-claude-code-plugin"` and `"args": []` if the binary resolves on your `PATH`.
+Claude config can use `"command": "socials"` and `"args": []` if the binary resolves on your `PATH`.
 
 ## Troubleshooting
 
@@ -169,6 +178,11 @@ socials-claude-code-plugin/
 ├── .claude-plugin/
 │   └── plugin.json        # Claude Code plugin manifest
 ├── .mcp.json              # MCP server config for the plugin (${CLAUDE_PLUGIN_ROOT})
+├── agents/
+│   ├── manager/AGENT.md    # @socials:manager — full-service manager
+│   ├── creator/AGENT.md    # @socials:creator — post creation
+│   ├── engage/AGENT.md     # @socials:engage — find & reply
+│   └── growth/AGENT.md     # @socials:growth — strategy & planning
 ├── skills/
 │   ├── setup/SKILL.md           # Slash skill — setup & troubleshooting
 │   ├── using-socials/SKILL.md   # Agent Skill — MCP tool workflow
