@@ -1,0 +1,41 @@
+{
+  "name": "brainrot-creations",
+  "owner": {
+    "name": "Brainrot Creations",
+    "email": "support@brainrotcreations.com"
+  },
+  "metadata": {
+    "description": "Official Brainrot Creations plugins for Claude Code - social media automation and productivity tools",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "socials",
+      "source": ".",
+      "description": "Connect Claude to X, LinkedIn, and Reddit via the Socials browser extension. Post, engage, search, and manage social media directly from Claude Code.",
+      "version": "1.0.0",
+      "author": {
+        "name": "Brainrot Creations"
+      },
+      "homepage": "https://socials.brainrotcreations.com",
+      "repository": "https://github.com/BrainrotCreations/socials-claude-code-plugin",
+      "license": "MIT",
+      "keywords": [
+        "mcp",
+        "social-media",
+        "x",
+        "twitter",
+        "linkedin",
+        "reddit",
+        "browser-extension",
+        "automation"
+      ],
+      "category": "external-integrations",
+      "tags": [
+        "social-media",
+        "automation",
+        "browser-extension"
+      ]
+    }
+  ]
+}
