@@ -16,6 +16,7 @@ export declare class ExtensionBridge {
     checkProAccess(): Promise<{
         isPro: boolean;
         tier: string;
+        canUseMcp: boolean;
     }>;
     getCurrentUser(): Promise<UserInfo>;
     getFeedPosts(platform: string, count?: number): Promise<FeedPost[]>;

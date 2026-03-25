@@ -190,11 +190,13 @@ export class ExtensionBridge {
     return this.wsServerListening;
   }
 
-  async checkProAccess(): Promise<{ isPro: boolean; tier: string }> {
+  async checkProAccess(): Promise<{ isPro: boolean; tier: string; canUseMcp: boolean }> {
     const result = await this.sendRequest<UserInfo>("check_pro_access", undefined);
+    const { isPro, tier, canUseMcp } = result.subscription;
     return {
-      isPro: result.subscription.isPro,
-      tier: result.subscription.tier,
+      isPro,
+      tier,
+      canUseMcp: canUseMcp ?? isPro,
     };
   }
 

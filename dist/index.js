@@ -72,12 +72,12 @@ const server = new Server({
 async function requireProAccess() {
     if (!bridge.isConnected()) {
         throw new Error("Socials extension not connected. Please:\n" +
-            "1. Open your browser with the Socials extension installed (paid plan — free tier cannot use MCP)\n" +
-            "2. Sign in and keep the extension loaded; it connects to Claude Code automatically when this MCP server is running");
+            "1. Open your browser with the Socials extension installed and signed in\n" +
+            "2. MCP is available on paid plans (or when your account is allowlisted). Open the side panel once so the extension loads; it connects when this MCP server is running");
     }
-    const { isPro, tier } = await bridge.checkProAccess();
-    if (!isPro) {
-        throw new Error(`This feature requires Socials Pro. Current tier: ${tier}\n` +
+    const { tier, canUseMcp } = await bridge.checkProAccess();
+    if (!canUseMcp) {
+        throw new Error(`Claude Code ↔ Socials requires a paid plan (or an allowlisted account). Current tier: ${tier}\n` +
             "Upgrade at https://socials.brainrotcreations.com/pricing");
     }
 }
@@ -97,7 +97,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             {
                 name: "socials_get_feed",
                 description: "Get recent posts from a social media feed. Requires Pro access. " +
-                    "Reads the pinned agent tab (set by socials_open_tab), not the tab you are looking at—so you can use other tabs while Claude uses the social tab in the background.",
+                    "Reads the pinned agent tab (set by socials_open_tab), not the tab or window you are looking at—works across Chrome windows.",
                 inputSchema: {
                     type: "object",
                     properties: {
@@ -265,7 +265,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             // Browser control tools
             {
                 name: "socials_open_tab",
-                description: "Open a URL in a new tab and pin it as the Socials agent tab. Feed, reply, scroll, search, and engage tools always target this pinned tab—not whichever tab is focused—so you can browse in other tabs. By default the new tab opens in the background (use focus: true to jump to it).",
+                description: "Open a URL in a new tab and pin it as the Socials agent tab. Automation targets this tab by ID across tabs and Chrome windows (not only the focused window). By default opens in the background (focus: true to switch to it). If a pin already exists, the new tab opens in the same window as that pin so a separate empty window does not steal the agent workspace.",
                 inputSchema: {
                     type: "object",
                     properties: {
@@ -421,15 +421,15 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                                     ws_server_listening: true,
                                     extension_connected: false,
                                     action: "MCP is listening; the browser extension has not connected to ws://127.0.0.1:9847. " +
-                                        "Use Chrome/Edge/Brave with Socials installed, sign in on a paid plan (free tier does not connect), " +
-                                        "open the side panel once so the extension loads, then reload the extension if needed. " +
+                                        "Use Chrome/Edge/Brave with Socials installed, sign in, open the side panel once so the extension loads " +
+                                        "(paid plan or allowlisted free tier), then reload the extension if needed. " +
                                         "Keep this Claude session open while testing.",
                                 }),
                             },
                         ],
                     };
                 }
-                const { isPro, tier } = await bridge.checkProAccess();
+                const { isPro, tier, canUseMcp } = await bridge.checkProAccess();
                 return {
                     content: [
                         {
@@ -440,9 +440,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                                 extension_connected: true,
                                 isPro,
                                 tier,
-                                message: isPro
-                                    ? "Connected with Pro access. Ready to use all Socials tools."
-                                    : `Connected but Pro access required. Current tier: ${tier}. Upgrade at https://socials.brainrotcreations.com/pricing`,
+                                canUseMcp,
+                                message: canUseMcp
+                                    ? isPro
+                                        ? "Connected with Pro access. Ready to use all Socials tools."
+                                        : "Connected with MCP access (allowlisted). Ready to use all Socials tools."
+                                    : `Connected but MCP tools require a paid plan (or allowlist). Current tier: ${tier}. Upgrade at https://socials.brainrotcreations.com/pricing`,
                             }),
                         },
                     ],

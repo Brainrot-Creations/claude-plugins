@@ -54,6 +54,8 @@ export interface UserInfo {
         tier: string;
         isActive: boolean;
         isPro: boolean;
+        /** When true, MCP tools are allowed (paid plan or PostHog allowlist for free tier). */
+        canUseMcp?: boolean;
     };
 }
 export interface FeedPost {

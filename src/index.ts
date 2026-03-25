@@ -99,15 +99,15 @@ async function requireProAccess(): Promise<void> {
   if (!bridge.isConnected()) {
     throw new Error(
       "Socials extension not connected. Please:\n" +
-      "1. Open your browser with the Socials extension installed (paid plan — free tier cannot use MCP)\n" +
-      "2. Sign in and keep the extension loaded; it connects to Claude Code automatically when this MCP server is running"
+      "1. Open your browser with the Socials extension installed and signed in\n" +
+      "2. MCP is available on paid plans (or when your account is allowlisted). Open the side panel once so the extension loads; it connects when this MCP server is running"
     );
   }
 
-  const { isPro, tier } = await bridge.checkProAccess();
-  if (!isPro) {
+  const { tier, canUseMcp } = await bridge.checkProAccess();
+  if (!canUseMcp) {
     throw new Error(
-      `This feature requires Socials Pro. Current tier: ${tier}\n` +
+      `Claude Code ↔ Socials requires a paid plan (or an allowlisted account). Current tier: ${tier}\n` +
       "Upgrade at https://socials.brainrotcreations.com/pricing"
     );
   }
@@ -479,8 +479,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                   extension_connected: false,
                   action:
                     "MCP is listening; the browser extension has not connected to ws://127.0.0.1:9847. " +
-                    "Use Chrome/Edge/Brave with Socials installed, sign in on a paid plan (free tier does not connect), " +
-                    "open the side panel once so the extension loads, then reload the extension if needed. " +
+                    "Use Chrome/Edge/Brave with Socials installed, sign in, open the side panel once so the extension loads " +
+                    "(paid plan or allowlisted free tier), then reload the extension if needed. " +
                     "Keep this Claude session open while testing.",
                 }),
               },
@@ -488,7 +488,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           };
         }
 
-        const { isPro, tier } = await bridge.checkProAccess();
+        const { isPro, tier, canUseMcp } = await bridge.checkProAccess();
         return {
           content: [
             {
@@ -499,9 +499,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 extension_connected: true,
                 isPro,
                 tier,
-                message: isPro
-                  ? "Connected with Pro access. Ready to use all Socials tools."
-                  : `Connected but Pro access required. Current tier: ${tier}. Upgrade at https://socials.brainrotcreations.com/pricing`,
+                canUseMcp,
+                message: canUseMcp
+                  ? isPro
+                    ? "Connected with Pro access. Ready to use all Socials tools."
+                    : "Connected with MCP access (allowlisted). Ready to use all Socials tools."
+                  : `Connected but MCP tools require a paid plan (or allowlist). Current tier: ${tier}. Upgrade at https://socials.brainrotcreations.com/pricing`,
               }),
             },
           ],
