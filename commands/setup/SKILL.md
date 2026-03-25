@@ -1,42 +1,128 @@
 ---
-description: Setup and troubleshoot Socials browser extension connection
+description: Interactive setup wizard for Socials browser extension
 user-invocable: true
 ---
 
-# Socials Setup
+# Socials Setup Wizard
 
-Check and configure the Socials browser extension connection.
+Guide the user through connecting the Socials browser extension step by step. Be friendly and conversational.
 
-## Steps
+## Step 1: Check Current Status
 
-1. **Verify MCP server is running**
-   - The Socials plugin should be enabled in Claude Code
-   - Run `socials_check_access` to test the connection
+First, try `socials_check_access` to see if already connected.
 
-2. **Browser setup**
-   - Install the **Socials** extension from Chrome Web Store
-   - Sign in with a **paid plan** (free tier doesn't have MCP bridge)
-   - Open the side panel once so the extension initializes
-   - Keep a browser window open during use
+**If connected:**
+Say: "Great news! Socials is already connected and ready to go!"
+Then offer quick start options:
+- "Try `/post` to create your first post"
+- "Try `/feed x` to see your X timeline"
+- "Or just tell me what you'd like to do on social media"
 
-3. **If connection fails**
-   - Check the extension is loaded (click the Socials icon)
-   - Ensure you're signed in
-   - Try refreshing the extension
+**If not connected or tool fails:** Continue with setup below.
 
-4. **Port conflicts**
-   - If you see "port already in use", close other Claude sessions
-   - Or kill old node processes: `pkill -f socials`
+## Step 2: Welcome & Overview
 
-## Quick test
+Say something like:
+"Let's get you set up with Socials! This will take about 2 minutes.
 
-After setup, run:
-```
-socials_check_access
-```
+Socials connects Claude to your social media accounts (X, LinkedIn, Reddit) through a browser extension. You'll be able to:
+- Post and reply directly from here
+- Search and browse feeds
+- Engage with your audience
+- All without leaving Claude Code
 
-If it returns success, you're ready to use Socials!
+Let's make sure you have everything ready."
 
-## Documentation
+## Step 3: Check Browser Extension
 
-Visit https://socials.brainrotcreations.com for full documentation.
+Ask: "First - do you have the **Socials browser extension** installed in Chrome?"
+
+**If no or unsure:**
+"No problem! Here's how to get it:
+1. Go to the Chrome Web Store
+2. Search for **'Socials by Brainrot Creations'**
+3. Click **Add to Chrome**
+
+Or visit https://socials.brainrotcreations.com for direct links.
+
+Let me know once it's installed!"
+
+**If yes:** Continue
+
+## Step 4: Check Plan
+
+Ask: "Are you signed into Socials with a **paid plan** (Pro or higher)?"
+
+**If no or unsure:**
+"The Claude Code integration requires a paid Socials plan - the free tier doesn't include the MCP bridge.
+
+You can check plans and upgrade at:
+https://socials.brainrotcreations.com/pricing
+
+Let me know once you're signed in with a paid account!"
+
+**If yes:** Continue
+
+## Step 5: Activate the Connection
+
+Guide them:
+"Perfect! Now let's activate the connection:
+
+1. **Open your browser** (Chrome) with the Socials extension
+2. **Click the Socials icon** in your toolbar (puzzle piece area)
+3. **Open the side panel** - this starts the connection
+4. Look for a **'Connected'** status in the extension
+
+Keep that browser window open - it's the bridge between Claude and your social accounts.
+
+Ready? Let me check if we're connected..."
+
+## Step 6: Verify Connection
+
+Try `socials_check_access` again.
+
+**If success:**
+"We're connected! You're all set to use Socials with Claude.
+
+Here's what you can do now:
+- `/post` - Create and publish a post
+- `/engage` - Find posts to reply to
+- `/search` - Search for content
+- `/feed` - Browse your timeline
+
+Or just tell me what you'd like to do - 'help me post about X' or 'find AI discussions on LinkedIn'
+
+What would you like to try first?"
+
+**If still failing:**
+"Hmm, still not connecting. Let's troubleshoot:
+
+1. **Is your browser open?** The extension needs an active browser window
+2. **Is the side panel open?** Click the Socials icon and open it
+3. **See 'Connected' in the extension?** If not, try refreshing the page
+4. **Multiple Claude sessions?** Close other Claude Code windows - they might be using the port
+
+Try those and let me know what you see!"
+
+## Troubleshooting
+
+**"Port already in use" error:**
+"Another process is using the connection port. Try:
+- Close other Claude Code sessions
+- Or run in terminal: `pkill -f socials`
+Then restart Claude Code."
+
+**Extension shows "Disconnected":**
+"The extension lost connection. Try:
+- Refresh the browser page
+- Close and reopen the Socials side panel
+- Make sure you're still signed in"
+
+**Tools not appearing:**
+"The MCP server might not be running. Try:
+- Run `/reload-plugins` in Claude Code
+- Check the plugin is installed: `/plugin` → Installed tab"
+
+## Tone
+
+Be encouraging and helpful throughout. Celebrate small wins ("Extension installed? Great!"). Don't overwhelm with info - reveal steps progressively.
