@@ -9002,7 +9002,7 @@ var require_websocket = __commonJS({
     var http = require("http");
     var net = require("net");
     var tls = require("tls");
-    var { randomBytes, createHash } = require("crypto");
+    var { randomBytes, createHash: createHash2 } = require("crypto");
     var { Duplex, Readable } = require("stream");
     var { URL: URL2 } = require("url");
     var PerMessageDeflate2 = require_permessage_deflate();
@@ -9662,7 +9662,7 @@ var require_websocket = __commonJS({
           abortHandshake(websocket, socket, "Invalid Upgrade header");
           return;
         }
-        const digest = createHash("sha1").update(key + GUID).digest("base64");
+        const digest = createHash2("sha1").update(key + GUID).digest("base64");
         if (res.headers["sec-websocket-accept"] !== digest) {
           abortHandshake(websocket, socket, "Invalid Sec-WebSocket-Accept header");
           return;
@@ -10029,7 +10029,7 @@ var require_websocket_server = __commonJS({
     var EventEmitter = require("events");
     var http = require("http");
     var { Duplex } = require("stream");
-    var { createHash } = require("crypto");
+    var { createHash: createHash2 } = require("crypto");
     var extension2 = require_extension();
     var PerMessageDeflate2 = require_permessage_deflate();
     var subprotocol2 = require_subprotocol();
@@ -10330,7 +10330,7 @@ var require_websocket_server = __commonJS({
           );
         }
         if (this._state > RUNNING) return abortHandshake(socket, 503);
-        const digest = createHash("sha1").update(key + GUID).digest("base64");
+        const digest = createHash2("sha1").update(key + GUID).digest("base64");
         const headers = [
           "HTTP/1.1 101 Switching Protocols",
           "Upgrade: websocket",
@@ -21876,6 +21876,65 @@ var ExtensionBridge = class {
   }
 };
 
+// src/analytics.ts
+var import_crypto2 = require("crypto");
+var import_os = require("os");
+var POSTHOG_HOST = process.env.POSTHOG_HOST || "https://us.i.posthog.com";
+var POSTHOG_API_KEY = process.env.POSTHOG_API_KEY || "phc_NxYGkalAkiTBbZOuQChvvHnfRBL7MJABKCuTVXdbyz4";
+function getAnonymousId() {
+  const raw = `${(0, import_os.hostname)()}-${process.env.USER || process.env.USERNAME || "unknown"}`;
+  return (0, import_crypto2.createHash)("sha256").update(raw).digest("hex").slice(0, 16);
+}
+var distinctId = getAnonymousId();
+var pluginVersion = "1.0.10";
+async function capture(event, properties = {}) {
+  try {
+    const payload = {
+      api_key: POSTHOG_API_KEY,
+      event,
+      distinct_id: distinctId,
+      timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+      properties: {
+        plugin_version: pluginVersion,
+        platform: process.platform,
+        node_version: process.version,
+        ...properties
+      }
+    };
+    fetch(`${POSTHOG_HOST}/capture/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    }).catch(() => {
+    });
+  } catch {
+  }
+}
+function trackServerStart() {
+  capture("mcp_server_started", {
+    source: "claude_code_plugin"
+  });
+}
+function trackExtensionConnected(tier) {
+  capture("mcp_extension_connected", {
+    tier: tier || "unknown"
+  });
+}
+function trackToolUsage(toolName, platform, success = true) {
+  capture("mcp_tool_called", {
+    tool: toolName,
+    platform: platform || "unknown",
+    success
+  });
+}
+function trackError(toolName, errorMessage) {
+  capture("mcp_tool_error", {
+    tool: toolName,
+    error: errorMessage.slice(0, 200)
+    // Truncate long errors
+  });
+}
+
 // src/index.ts
 var bridge = new ExtensionBridge();
 var GetFeedPostsSchema = external_exports.object({
@@ -22405,7 +22464,9 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
 });
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
+  const platform = args && typeof args === "object" && "platform" in args ? String(args.platform) : void 0;
   try {
+    trackToolUsage(name, platform);
     switch (name) {
       case "socials_check_access": {
         const wsServerListening = bridge.isWsServerListening();
@@ -22441,6 +22502,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           };
         }
         const { isPro, tier, canUseMcp } = await bridge.checkProAccess();
+        trackExtensionConnected(tier);
         return {
           content: [
             {
@@ -22956,6 +23018,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     }
   } catch (error2) {
     const errorMessage = error2 instanceof Error ? error2.message : "Unknown error";
+    trackError(name, errorMessage);
     return {
       content: [
         {
@@ -22971,6 +23034,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   }
 });
 async function main() {
+  trackServerStart();
   try {
     await bridge.start();
     console.error("[socials-plugin] Extension bridge started");

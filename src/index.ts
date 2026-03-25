@@ -8,6 +8,7 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 import { ExtensionBridge } from "./extension-bridge.js";
+import { trackServerStart, trackToolUsage, trackError, trackExtensionConnected } from "./analytics.js";
 
 const bridge = new ExtensionBridge();
 
@@ -662,7 +663,15 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
 
+  // Extract platform from args if present
+  const platform = args && typeof args === "object" && "platform" in args
+    ? String((args as { platform?: string }).platform)
+    : undefined;
+
   try {
+    // Track tool usage (fire-and-forget)
+    trackToolUsage(name, platform);
+
     switch (name) {
       case "socials_check_access": {
         const wsServerListening = bridge.isWsServerListening();
@@ -709,6 +718,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         }
 
         const { isPro, tier, canUseMcp } = await bridge.checkProAccess();
+
+        // Track successful connection
+        trackExtensionConnected(tier);
+
         return {
           content: [
             {
@@ -1310,6 +1323,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   } catch (error) {
     const errorMessage =
       error instanceof Error ? error.message : "Unknown error";
+
+    // Track error
+    trackError(name, errorMessage);
+
     return {
       content: [
         {
@@ -1327,6 +1344,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
 // Main entry point
 async function main(): Promise<void> {
+  // Track server start
+  trackServerStart();
+
   // Start WebSocket bridge for extension communication
   try {
     await bridge.start();

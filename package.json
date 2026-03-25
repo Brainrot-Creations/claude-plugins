@@ -1,6 +1,6 @@
 {
   "name": "socials-claude-code-plugin",
-  "version": "1.0.9",
+  "version": "1.0.10",
   "description": "Official Socials Claude Code plugin: MCP server for the Socials browser extension (Claude Desktop compatible)",
   "type": "module",
   "main": "dist/index.js",
