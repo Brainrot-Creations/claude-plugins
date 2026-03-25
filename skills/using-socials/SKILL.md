@@ -17,7 +17,9 @@ Follow this flow unless the user explicitly asks for something else.
 - Use **`socials_open_tab`** with a concrete URL first. That tab is **pinned** as the Socials **agent tab**: feed, reply, scroll, search, and engage run there even if the user is focused on another tab or another **Chrome window**—automation uses the pinned tab id, not “the focused window.” By default the tab opens in the **background**; use **`focus: true`** to switch to it, or **`socials_focus_agent_tab`** to bring that tab’s window forward. Additional **`socials_open_tab`** calls open in the **same window as the pinned tab** when possible so a new empty window does not hijack the agent workspace.
 - **`socials_get_agent_tab`** — see which tab is pinned. **`socials_set_agent_tab`** — pin an existing tab (e.g. X already open) by `tab_id` from **`socials_get_active_tab`**.
 - Use **`socials_navigate`**, **`socials_reload_tab`**, or **`socials_scroll`** on the agent tab (omit `tab_id` unless targeting a specific tab). **`socials_get_active_tab`** is the **focused** tab (what the user sees), not necessarily the agent tab.
-- **`socials_x_search`** — search on X in the agent tab, then **`socials_get_feed`** / **`socials_quick_reply`** / **`socials_engage_post`** on results.
+- **If platform is X:** use **`socials_x_search`** first, then **`socials_get_feed`** / **`socials_quick_reply`** / (optionally) **`socials_engage_post`** on results.
+- **If platform is LinkedIn:** use **`socials_open_tab`** with `https://www.linkedin.com/feed/` and then **`socials_get_feed`** / **`socials_quick_reply`** (optionally **`socials_scroll`**) to work with posts and replies.
+- **If platform is Reddit:** use **`socials_open_tab`** with the subreddit URL and then **`socials_get_feed`** / **`socials_quick_reply`** (optionally **`socials_scroll`**) to work with posts.
 
 ## 3. Read content
 

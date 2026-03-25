@@ -94,8 +94,7 @@ Ask clarifying questions if needed:
 | `socials_get_post_context` | Get full thread context |
 | `socials_generate_reply` | AI-generate a reply |
 | `socials_quick_reply` | Post a reply |
-| `socials_like_post` | Like a post |
-| `socials_repost` | Repost/retweet |
+| `socials_engage_post` | X-only engagement (like/repost/bookmark/share) |
 
 ## Example interactions
 

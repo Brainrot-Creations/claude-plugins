@@ -13,36 +13,62 @@ const bridge = new ExtensionBridge();
 
 // Tool schemas
 const GetFeedPostsSchema = z.object({
-  platform: z.enum(["x", "linkedin", "reddit"]).describe("Social media platform"),
-  count: z.number().optional().default(10).describe("Number of posts to fetch (default: 10)"),
+  platform: z
+    .enum(["x", "linkedin", "reddit"])
+    .describe("Social media platform"),
+  count: z
+    .number()
+    .optional()
+    .default(10)
+    .describe("Number of posts to fetch (default: 10)"),
 });
 
 const GetPostContextSchema = z.object({
-  platform: z.enum(["x", "linkedin", "reddit"]).describe("Social media platform"),
+  platform: z
+    .enum(["x", "linkedin", "reddit"])
+    .describe("Social media platform"),
   post_url: z.string().describe("URL of the post to get context for"),
 });
 
 const GenerateReplySchema = z.object({
-  platform: z.enum(["x", "linkedin", "reddit"]).describe("Social media platform"),
+  platform: z
+    .enum(["x", "linkedin", "reddit"])
+    .describe("Social media platform"),
   post_content: z.string().describe("Content of the post to reply to"),
   post_author: z.string().describe("Author/handle of the post"),
-  persona_id: z.string().optional().describe("Persona ID to use for generation"),
-  mood: z.string().optional().describe("Mood/tone for the reply (e.g., witty, professional)"),
+  persona_id: z
+    .string()
+    .optional()
+    .describe("Persona ID to use for generation"),
+  mood: z
+    .string()
+    .optional()
+    .describe("Mood/tone for the reply (e.g., witty, professional)"),
 });
 
 const CreatePostSchema = z.object({
-  platform: z.literal("x").describe("Only X (Twitter) is supported for new posts via the extension"),
-  content: z.string().min(1).describe("Full text of the new post (X character limits apply)"),
+  platform: z
+    .literal("x")
+    .describe("Only X (Twitter) is supported for new posts via the extension"),
+  content: z
+    .string()
+    .min(1)
+    .describe("Full text of the new post (X character limits apply)"),
 });
 
 const EngagePostSchema = z.object({
-  platform: z.literal("x").describe("Only X is supported for feed engagement via the extension"),
-  post_id: z.string().min(1).describe("Tweet id from socials_get_feed (numeric status id)"),
+  platform: z
+    .literal("x")
+    .describe("Only X is supported for feed engagement via the extension"),
+  post_id: z
+    .string()
+    .min(1)
+    .describe("Tweet id from socials_get_feed (numeric status id)"),
   actions: z
     .array(z.enum(["like", "repost", "bookmark", "share"]))
     .min(1)
     .describe(
-      "One or more actions to run in order on that tweet. like/repost/bookmark toggle if already engaged. share opens the share menu."
+      "One or more actions to run in order on that tweet. like/repost/bookmark toggle if already engaged. share opens the share menu.",
     ),
 });
 
@@ -50,7 +76,9 @@ const XSearchSchema = z.object({
   query: z
     .string()
     .min(1)
-    .describe('X search text (e.g. "startup", hashtag, or from:user). Submits the top search field and navigates to results.'),
+    .describe(
+      'X search text (e.g. "startup", hashtag, or from:user). Submits the top search field and navigates to results.',
+    ),
 });
 
 // Browser control schemas
@@ -60,25 +88,33 @@ const OpenTabSchema = z.object({
     .boolean()
     .optional()
     .describe(
-      "If true, switch Chrome to this tab. Default false: tab opens in the background so you can keep working elsewhere; it becomes the pinned agent tab for all Socials automation."
+      "If true, switch Chrome to this tab. Default false: tab opens in the background so you can keep working elsewhere; it becomes the pinned agent tab for all Socials automation.",
     ),
 });
 
 const NavigateToSchema = z.object({
   url: z.string().describe("URL to navigate to"),
-  tab_id: z.number().optional().describe(
-    "Tab ID to navigate. If omitted, navigates the pinned agent tab (from socials_open_tab), not necessarily the foreground tab."
-  ),
+  tab_id: z
+    .number()
+    .optional()
+    .describe(
+      "Tab ID to navigate. If omitted, navigates the pinned agent tab (from socials_open_tab), not necessarily the foreground tab.",
+    ),
 });
 
 const SetAgentTabSchema = z.object({
   tab_id: z
     .number()
-    .describe("Existing Chrome tab ID to use as the Socials agent tab (from socials_get_active_tab or the tab bar)."),
+    .describe(
+      "Existing Chrome tab ID to use as the Socials agent tab (from socials_get_active_tab or the tab bar).",
+    ),
 });
 
 const ReloadTabSchema = z.object({
-  tab_id: z.number().optional().describe("Tab ID to reload (uses active tab if not provided)"),
+  tab_id: z
+    .number()
+    .optional()
+    .describe("Tab ID to reload (uses active tab if not provided)"),
 });
 
 // Create MCP server
@@ -91,7 +127,7 @@ const server = new Server(
     capabilities: {
       tools: {},
     },
-  }
+  },
 );
 
 // Helper to check Pro access before operations
@@ -99,8 +135,8 @@ async function requireProAccess(): Promise<void> {
   if (!bridge.isConnected()) {
     throw new Error(
       "Socials extension not connected. Please:\n" +
-      "1. Open your browser with the Socials extension installed and signed in\n" +
-      "2. MCP is available on paid plans (or when your account is allowlisted). Open the side panel once so the extension loads; it connects when this MCP server is running"
+        "1. Open your browser with the Socials extension installed and signed in\n" +
+        "2. MCP is available on paid plans (or when your account is allowlisted). Open the side panel once so the extension loads; it connects when this MCP server is running",
     );
   }
 
@@ -108,7 +144,7 @@ async function requireProAccess(): Promise<void> {
   if (!canUseMcp) {
     throw new Error(
       `Claude Code ↔ Socials requires a paid plan (or an allowlisted account). Current tier: ${tier}\n` +
-      "Upgrade at https://socials.brainrotcreations.com/pricing"
+        "Upgrade at https://socials.brainrotcreations.com/pricing",
     );
   }
 }
@@ -194,7 +230,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             },
             mood: {
               type: "string",
-              description: "Optional: mood/tone (witty, professional, casual, etc.)",
+              description:
+                "Optional: mood/tone (witty, professional, casual, etc.)",
             },
           },
           required: ["platform", "post_content", "post_author"],
@@ -313,7 +350,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           properties: {
             url: {
               type: "string",
-              description: "URL to open. Use https://x.com/home for X feed.",
+              description:
+                "URL to open. Use https://x.com/home for X feed, https://www.linkedin.com/feed/ for LinkedIn feed, and https://www.reddit.com/ (or a subreddit URL) for Reddit.",
             },
             focus: {
               type: "boolean",
@@ -391,14 +429,14 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: "socials_reload_tab",
-        description:
-          "Reload the pinned agent tab, or tab_id if provided.",
+        description: "Reload the pinned agent tab, or tab_id if provided.",
         inputSchema: {
           type: "object",
           properties: {
             tab_id: {
               type: "number",
-              description: "Optional. If omitted, reloads the pinned agent tab.",
+              description:
+                "Optional. If omitted, reloads the pinned agent tab.",
             },
           },
           required: [],
@@ -514,7 +552,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case "socials_get_feed": {
         await requireProAccess();
         const parsed = GetFeedPostsSchema.parse(args);
-        const posts = await bridge.getFeedPosts(parsed.platform, Math.min(parsed.count || 10, 50));
+        const posts = await bridge.getFeedPosts(
+          parsed.platform,
+          Math.min(parsed.count || 10, 50),
+        );
 
         return {
           content: [
@@ -540,7 +581,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case "socials_get_post_context": {
         await requireProAccess();
         const parsed = GetPostContextSchema.parse(args);
-        const context = await bridge.getPostContext(parsed.platform, parsed.post_url);
+        const context = await bridge.getPostContext(
+          parsed.platform,
+          parsed.post_url,
+        );
 
         return {
           content: [
@@ -560,7 +604,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           parsed.post_content,
           parsed.post_author,
           parsed.persona_id,
-          parsed.mood
+          parsed.mood,
         );
 
         return {
@@ -771,8 +815,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                     }
                   : {
                       agentTab: null,
-                      message: "No agent tab pinned yet. Call socials_open_tab or socials_set_agent_tab.",
-                    }
+                      message:
+                        "No agent tab pinned yet. Call socials_open_tab or socials_set_agent_tab.",
+                    },
               ),
             },
           ],
@@ -838,9 +883,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case "socials_get_page_content": {
         await requireProAccess();
-        const tabId = args && typeof args === "object" && "tab_id" in args
-          ? (args as { tab_id?: number }).tab_id
-          : undefined;
+        const tabId =
+          args && typeof args === "object" && "tab_id" in args
+            ? (args as { tab_id?: number }).tab_id
+            : undefined;
         const result = await bridge.getPageContent(tabId);
 
         const payload: Record<string, unknown> = {
@@ -882,7 +928,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         throw new Error(`Unknown tool: ${name}`);
     }
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown error";
     return {
       content: [
         {
@@ -911,7 +958,7 @@ async function main(): Promise<void> {
       console.error(
         "[socials-plugin] Another process holds port 9847 (often a stale Socials MCP process). " +
           "Fix: quit duplicate Claude windows, or run `lsof -nP -iTCP:9847 | grep LISTEN` and kill that PID. " +
-          "Optional: set env SOCIALS_MCP_RECLAIM_PORT=1 on this MCP server to SIGTERM listeners on 9847 before bind."
+          "Optional: set env SOCIALS_MCP_RECLAIM_PORT=1 on this MCP server to SIGTERM listeners on 9847 before bind.",
       );
     }
     // Continue anyway - tools will report extension not connected

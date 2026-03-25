@@ -131,7 +131,7 @@ If any answer is **No**, reconsider or revise.
 
 | Tool | Purpose |
 |------|---------|
-| `socials_x_search` | Find relevant conversations |
+| `socials_x_search` | X-only: search for relevant conversations |
 | `socials_get_feed` | Scan for promo opportunities |
 | `socials_get_post_context` | Understand full context before replying |
 | `socials_generate_reply` | AI reply (may include product if enabled) |

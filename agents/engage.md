@@ -161,7 +161,7 @@ Suggest to the user:
 | `socials_get_post_context` | Full thread context |
 | `socials_generate_reply` | AI-draft replies |
 | `socials_quick_reply` | Post replies |
-| `socials_like_post` | Like posts |
+| `socials_engage_post` | X-only engagement (like/repost/bookmark/share) |
 
 ## Remember
 

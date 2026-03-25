@@ -108,18 +108,33 @@ export interface FeedPost {
     isVerified?: boolean;
   };
   content: string;
+  /** LinkedIn uses 'text' instead of 'content' */
+  text?: string;
   timestamp: string;
   engagement?: {
     likes?: number;
     replies?: number;
     reposts?: number;
   };
+  /** Whether this is the focused/main post being replied to */
+  isFocused?: boolean;
+  /** URLs extracted from post content */
+  urls?: Array<{ url: string; type?: string }>;
 }
 
 export interface PostContext {
   mainPost: FeedPost;
   replies?: FeedPost[];
   quotedPost?: FeedPost;
+  /** Thread context for LinkedIn - the original post when replying to a comment */
+  threadContext?: FeedPost[];
+  /** Who we're replying to (LinkedIn comment replies) */
+  replyingTo?: {
+    handle: string;
+    name: string;
+  };
+  /** Context type: feed (main timeline) or thread (comment thread) */
+  contextType?: "feed" | "thread";
 }
 
 export interface PersonaInfo {

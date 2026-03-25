@@ -7,27 +7,53 @@ import { ExtensionBridge } from "./extension-bridge.js";
 const bridge = new ExtensionBridge();
 // Tool schemas
 const GetFeedPostsSchema = z.object({
-    platform: z.enum(["x", "linkedin", "reddit"]).describe("Social media platform"),
-    count: z.number().optional().default(10).describe("Number of posts to fetch (default: 10)"),
+    platform: z
+        .enum(["x", "linkedin", "reddit"])
+        .describe("Social media platform"),
+    count: z
+        .number()
+        .optional()
+        .default(10)
+        .describe("Number of posts to fetch (default: 10)"),
 });
 const GetPostContextSchema = z.object({
-    platform: z.enum(["x", "linkedin", "reddit"]).describe("Social media platform"),
+    platform: z
+        .enum(["x", "linkedin", "reddit"])
+        .describe("Social media platform"),
     post_url: z.string().describe("URL of the post to get context for"),
 });
 const GenerateReplySchema = z.object({
-    platform: z.enum(["x", "linkedin", "reddit"]).describe("Social media platform"),
+    platform: z
+        .enum(["x", "linkedin", "reddit"])
+        .describe("Social media platform"),
     post_content: z.string().describe("Content of the post to reply to"),
     post_author: z.string().describe("Author/handle of the post"),
-    persona_id: z.string().optional().describe("Persona ID to use for generation"),
-    mood: z.string().optional().describe("Mood/tone for the reply (e.g., witty, professional)"),
+    persona_id: z
+        .string()
+        .optional()
+        .describe("Persona ID to use for generation"),
+    mood: z
+        .string()
+        .optional()
+        .describe("Mood/tone for the reply (e.g., witty, professional)"),
 });
 const CreatePostSchema = z.object({
-    platform: z.literal("x").describe("Only X (Twitter) is supported for new posts via the extension"),
-    content: z.string().min(1).describe("Full text of the new post (X character limits apply)"),
+    platform: z
+        .literal("x")
+        .describe("Only X (Twitter) is supported for new posts via the extension"),
+    content: z
+        .string()
+        .min(1)
+        .describe("Full text of the new post (X character limits apply)"),
 });
 const EngagePostSchema = z.object({
-    platform: z.literal("x").describe("Only X is supported for feed engagement via the extension"),
-    post_id: z.string().min(1).describe("Tweet id from socials_get_feed (numeric status id)"),
+    platform: z
+        .literal("x")
+        .describe("Only X is supported for feed engagement via the extension"),
+    post_id: z
+        .string()
+        .min(1)
+        .describe("Tweet id from socials_get_feed (numeric status id)"),
     actions: z
         .array(z.enum(["like", "repost", "bookmark", "share"]))
         .min(1)
@@ -49,7 +75,10 @@ const OpenTabSchema = z.object({
 });
 const NavigateToSchema = z.object({
     url: z.string().describe("URL to navigate to"),
-    tab_id: z.number().optional().describe("Tab ID to navigate. If omitted, navigates the pinned agent tab (from socials_open_tab), not necessarily the foreground tab."),
+    tab_id: z
+        .number()
+        .optional()
+        .describe("Tab ID to navigate. If omitted, navigates the pinned agent tab (from socials_open_tab), not necessarily the foreground tab."),
 });
 const SetAgentTabSchema = z.object({
     tab_id: z
@@ -57,7 +86,10 @@ const SetAgentTabSchema = z.object({
         .describe("Existing Chrome tab ID to use as the Socials agent tab (from socials_get_active_tab or the tab bar)."),
 });
 const ReloadTabSchema = z.object({
-    tab_id: z.number().optional().describe("Tab ID to reload (uses active tab if not provided)"),
+    tab_id: z
+        .number()
+        .optional()
+        .describe("Tab ID to reload (uses active tab if not provided)"),
 });
 // Create MCP server
 const server = new Server({
@@ -271,7 +303,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                     properties: {
                         url: {
                             type: "string",
-                            description: "URL to open. Use https://x.com/home for X feed.",
+                            description: "URL to open. Use https://x.com/home for X feed, https://www.linkedin.com/feed/ for LinkedIn feed, and https://www.reddit.com/ (or a subreddit URL) for Reddit.",
                         },
                         focus: {
                             type: "boolean",
