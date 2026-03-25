@@ -16,5 +16,6 @@
     "linkedin",
     "reddit",
     "claude-code-plugin"
-  ]
+  ],
+  "mcpServers": ".mcp.json"
 }
