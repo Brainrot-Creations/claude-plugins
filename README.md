@@ -1,5 +1,13 @@
 # Socials Claude Code plugin
 
+## Quick Install (copy this to Claude Code)
+
+```
+Clone https://github.com/BrainrotCreations/socials-claude-code-plugin, run npm install && npm run build, then add it to my plugins in settings.json
+```
+
+---
+
 **`socials-claude-code-plugin`** — a **[Model Context Protocol](https://modelcontextprotocol.io/)** (MCP) server and **[Claude Code plugin](https://code.claude.com/docs/en/plugins.md)** that connects **[Claude](https://www.anthropic.com/claude)** ([Desktop](https://claude.ai/download) or [Claude Code](https://docs.anthropic.com/en/docs/claude-code)) to the **[Socials](https://socials.brainrotcreations.com)** browser extension so Claude can help with X, LinkedIn, and Reddit in Chrome (or another supported browser).
 
 The repo follows the same layout as [Anthropic’s official plugins](https://github.com/anthropics/claude-code/tree/main/plugins): `.claude-plugin/plugin.json` plus root `.mcp.json` so enabling the plugin starts the MCP server automatically. You can still run it as a plain stdio MCP server (Desktop or manual Claude Code config).
@@ -67,16 +75,38 @@ Optional env on the server entry:
 
 This matches the [plugin directory structure](https://github.com/anthropics/claude-code/tree/main/plugins) (`plugin-name/.claude-plugin/plugin.json`, optional `commands/`, `agents/`, `skills/`, `hooks/`, **`.mcp.json`**).
 
-**Install**
+**Install from GitHub**
 
-1. Clone or copy this repository (or add it as a [marketplace](https://code.claude.com/docs/en/plugin-marketplaces) entry if you publish one).
-2. In Claude Code, install the plugin (e.g. `/plugin`) or load it for a session without installing:
+1. Clone and build the repository:
+
+   ```bash
+   git clone https://github.com/BrainrotCreations/socials-claude-code-plugin.git
+   cd socials-claude-code-plugin
+   npm install
+   npm run build
+   ```
+
+2. Choose one of these options:
+
+   **Option A: Permanent install (recommended)**
+
+   Add to your Claude Code settings (`~/.claude/settings.json` or project `.claude/settings.json`):
+
+   ```json
+   {
+     "plugins": ["/absolute/path/to/socials-claude-code-plugin"]
+   }
+   ```
+
+   **Option B: Load for current session only**
 
    ```bash
    claude --plugin-dir /absolute/path/to/socials-claude-code-plugin
    ```
 
 3. Enable the **socials-claude-code-plugin** plugin. The bundled `.mcp.json` starts **`node ${CLAUDE_PLUGIN_ROOT}/dist/index.js`** with **`SOCIALS_MCP_RECLAIM_PORT=1`** (see [plugin MCP docs](https://code.claude.com/docs/en/plugins-reference.md#mcp-servers)).
+
+> **Note:** The `/plugin install` command expects a marketplace URL, not a GitHub URL. Use the clone method above for GitHub-hosted plugins.
 
 **Developing in this repo**
 
