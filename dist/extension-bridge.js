@@ -235,6 +235,22 @@ export class ExtensionBridge {
     async scrollPage(direction, amount) {
         return this.sendRequest("scroll_page", { direction, amount });
     }
+    // LinkedIn People Search methods
+    async linkedinPeopleSearch(query) {
+        return this.sendRequest("linkedin_people_search", { query });
+    }
+    async linkedinGetPeople(count) {
+        return this.sendRequest("linkedin_get_people", { count });
+    }
+    async linkedinConnect(profileUrl, note) {
+        return this.sendRequest("linkedin_connect", { profileUrl, note });
+    }
+    async linkedinNextPage() {
+        return this.sendRequest("linkedin_next_page", {});
+    }
+    async linkedinGoToPage(page) {
+        return this.sendRequest("linkedin_go_to_page", { page });
+    }
     stop() {
         this.wsServerListening = false;
         if (this.pingInterval) {

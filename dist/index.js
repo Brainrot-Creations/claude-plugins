@@ -414,6 +414,80 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                     required: [],
                 },
             },
+            // LinkedIn People Search tools
+            {
+                name: "socials_linkedin_people_search",
+                description: "Search for people on LinkedIn. Navigates to the search results page in the pinned agent tab. " +
+                    "Returns list of people with their profiles. Use socials_linkedin_get_people to get the results after search.",
+                inputSchema: {
+                    type: "object",
+                    properties: {
+                        query: {
+                            type: "string",
+                            description: "Search query (e.g., 'software engineer amazon', 'product manager google')",
+                        },
+                    },
+                    required: ["query"],
+                },
+            },
+            {
+                name: "socials_linkedin_get_people",
+                description: "Get people results from the current LinkedIn people search page. " +
+                    "Returns array of people with name, headline, location, profile URL, and connection status. " +
+                    "Also returns pagination info (current page, total pages, has next/prev).",
+                inputSchema: {
+                    type: "object",
+                    properties: {
+                        count: {
+                            type: "number",
+                            description: "Maximum number of people to return (default: 10)",
+                        },
+                    },
+                    required: [],
+                },
+            },
+            {
+                name: "socials_linkedin_connect",
+                description: "Send a connection request to a person on LinkedIn. Must be on a people search results page. " +
+                    "IMPORTANT: Always confirm with the user before sending connection requests.",
+                inputSchema: {
+                    type: "object",
+                    properties: {
+                        profile_url: {
+                            type: "string",
+                            description: "LinkedIn profile URL of the person to connect with (e.g., '/in/username/' or full URL)",
+                        },
+                        note: {
+                            type: "string",
+                            description: "Optional personalized note to include with the connection request (max 300 chars)",
+                        },
+                    },
+                    required: ["profile_url"],
+                },
+            },
+            {
+                name: "socials_linkedin_next_page",
+                description: "Go to the next page of LinkedIn search results. Returns false if already on the last page.",
+                inputSchema: {
+                    type: "object",
+                    properties: {},
+                    required: [],
+                },
+            },
+            {
+                name: "socials_linkedin_go_to_page",
+                description: "Go to a specific page number of LinkedIn search results.",
+                inputSchema: {
+                    type: "object",
+                    properties: {
+                        page: {
+                            type: "number",
+                            description: "Page number to navigate to (1-based)",
+                        },
+                    },
+                    required: ["page"],
+                },
+            },
         ],
     };
 });
@@ -799,6 +873,104 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                         {
                             type: "text",
                             text: JSON.stringify({ success: true }),
+                        },
+                    ],
+                };
+            }
+            // LinkedIn People Search tools
+            case "socials_linkedin_people_search": {
+                await requireProAccess();
+                const query = args.query;
+                const result = await bridge.linkedinPeopleSearch(query);
+                return {
+                    content: [
+                        {
+                            type: "text",
+                            text: JSON.stringify({
+                                success: result.success,
+                                url: result.url,
+                                error: result.error,
+                                message: result.success
+                                    ? `Navigated to LinkedIn people search for "${query}". Use socials_linkedin_get_people to get results.`
+                                    : result.error,
+                            }),
+                        },
+                    ],
+                };
+            }
+            case "socials_linkedin_get_people": {
+                await requireProAccess();
+                const count = args?.count || 10;
+                const result = await bridge.linkedinGetPeople(count);
+                return {
+                    content: [
+                        {
+                            type: "text",
+                            text: JSON.stringify({
+                                success: result.success,
+                                people: result.people,
+                                pagination: result.pagination,
+                                error: result.error,
+                            }),
+                        },
+                    ],
+                };
+            }
+            case "socials_linkedin_connect": {
+                await requireProAccess();
+                const profileUrl = args.profile_url;
+                const note = args?.note;
+                const result = await bridge.linkedinConnect(profileUrl, note);
+                return {
+                    content: [
+                        {
+                            type: "text",
+                            text: JSON.stringify({
+                                success: result.success,
+                                error: result.error,
+                                message: result.success
+                                    ? "Connection request sent successfully"
+                                    : result.error,
+                            }),
+                        },
+                    ],
+                };
+            }
+            case "socials_linkedin_next_page": {
+                await requireProAccess();
+                const result = await bridge.linkedinNextPage();
+                return {
+                    content: [
+                        {
+                            type: "text",
+                            text: JSON.stringify({
+                                success: result.success,
+                                currentPage: result.currentPage,
+                                error: result.error,
+                                message: result.success
+                                    ? `Navigated to page ${result.currentPage}`
+                                    : result.error || "Already on last page",
+                            }),
+                        },
+                    ],
+                };
+            }
+            case "socials_linkedin_go_to_page": {
+                await requireProAccess();
+                const page = args.page;
+                const result = await bridge.linkedinGoToPage(page);
+                return {
+                    content: [
+                        {
+                            type: "text",
+                            text: JSON.stringify({
+                                success: result.success,
+                                currentPage: result.currentPage,
+                                error: result.error,
+                                message: result.success
+                                    ? `Navigated to page ${result.currentPage}`
+                                    : result.error,
+                            }),
                         },
                     ],
                 };

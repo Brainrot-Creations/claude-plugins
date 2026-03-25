@@ -39,7 +39,13 @@ export type ExtensionMessageType =
   | "create_post"
   | "engage_post"
   | "x_search"
-  | "scroll_page";
+  | "scroll_page"
+  // LinkedIn People Search
+  | "linkedin_people_search"
+  | "linkedin_get_people"
+  | "linkedin_connect"
+  | "linkedin_next_page"
+  | "linkedin_go_to_page";
 
 // Payloads for each message type
 export interface GetFeedPostsPayload {

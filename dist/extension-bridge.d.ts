@@ -96,6 +96,44 @@ export declare class ExtensionBridge {
     scrollPage(direction: string, amount: number): Promise<{
         success: boolean;
     }>;
+    linkedinPeopleSearch(query: string): Promise<{
+        success: boolean;
+        url?: string;
+        error?: string;
+    }>;
+    linkedinGetPeople(count: number): Promise<{
+        success: boolean;
+        people?: Array<{
+            name: string;
+            headline: string;
+            location: string;
+            profileUrl: string;
+            imageUrl?: string;
+            connectionDegree?: string;
+            currentPosition?: string;
+        }>;
+        pagination?: {
+            currentPage: number;
+            totalPages: number;
+            hasNext: boolean;
+            hasPrev: boolean;
+        };
+        error?: string;
+    }>;
+    linkedinConnect(profileUrl: string, note?: string): Promise<{
+        success: boolean;
+        error?: string;
+    }>;
+    linkedinNextPage(): Promise<{
+        success: boolean;
+        currentPage?: number;
+        error?: string;
+    }>;
+    linkedinGoToPage(page: number): Promise<{
+        success: boolean;
+        currentPage?: number;
+        error?: string;
+    }>;
     stop(): void;
 }
 //# sourceMappingURL=extension-bridge.d.ts.map

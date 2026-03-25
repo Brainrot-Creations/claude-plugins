@@ -363,6 +363,92 @@ export class ExtensionBridge {
     return this.sendRequest<{ success: boolean }>("scroll_page", { direction, amount });
   }
 
+  // LinkedIn People Search methods
+  async linkedinPeopleSearch(query: string): Promise<{
+    success: boolean;
+    url?: string;
+    error?: string;
+  }> {
+    return this.sendRequest<{ success: boolean; url?: string; error?: string }>(
+      "linkedin_people_search",
+      { query }
+    );
+  }
+
+  async linkedinGetPeople(count: number): Promise<{
+    success: boolean;
+    people?: Array<{
+      name: string;
+      headline: string;
+      location: string;
+      profileUrl: string;
+      imageUrl?: string;
+      connectionDegree?: string;
+      currentPosition?: string;
+    }>;
+    pagination?: {
+      currentPage: number;
+      totalPages: number;
+      hasNext: boolean;
+      hasPrev: boolean;
+    };
+    error?: string;
+  }> {
+    return this.sendRequest<{
+      success: boolean;
+      people?: Array<{
+        name: string;
+        headline: string;
+        location: string;
+        profileUrl: string;
+        imageUrl?: string;
+        connectionDegree?: string;
+        currentPosition?: string;
+      }>;
+      pagination?: {
+        currentPage: number;
+        totalPages: number;
+        hasNext: boolean;
+        hasPrev: boolean;
+      };
+      error?: string;
+    }>("linkedin_get_people", { count });
+  }
+
+  async linkedinConnect(
+    profileUrl: string,
+    note?: string
+  ): Promise<{ success: boolean; error?: string }> {
+    return this.sendRequest<{ success: boolean; error?: string }>(
+      "linkedin_connect",
+      { profileUrl, note }
+    );
+  }
+
+  async linkedinNextPage(): Promise<{
+    success: boolean;
+    currentPage?: number;
+    error?: string;
+  }> {
+    return this.sendRequest<{
+      success: boolean;
+      currentPage?: number;
+      error?: string;
+    }>("linkedin_next_page", {});
+  }
+
+  async linkedinGoToPage(page: number): Promise<{
+    success: boolean;
+    currentPage?: number;
+    error?: string;
+  }> {
+    return this.sendRequest<{
+      success: boolean;
+      currentPage?: number;
+      error?: string;
+    }>("linkedin_go_to_page", { page });
+  }
+
   stop(): void {
     this.wsServerListening = false;
     if (this.pingInterval) {

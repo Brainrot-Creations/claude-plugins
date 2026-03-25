@@ -10,7 +10,7 @@ export interface ExtensionResponse {
     data?: unknown;
     error?: string;
 }
-export type ExtensionMessageType = "ping" | "check_pro_access" | "get_current_user" | "get_feed_posts" | "get_post_context" | "generate_reply" | "submit_reply" | "list_personas" | "get_settings" | "open_tab" | "navigate_to" | "get_active_tab" | "get_agent_tab" | "focus_agent_tab" | "set_agent_tab" | "reload_tab" | "close_tab" | "get_page_content" | "quick_reply" | "create_post" | "engage_post" | "x_search" | "scroll_page";
+export type ExtensionMessageType = "ping" | "check_pro_access" | "get_current_user" | "get_feed_posts" | "get_post_context" | "generate_reply" | "submit_reply" | "list_personas" | "get_settings" | "open_tab" | "navigate_to" | "get_active_tab" | "get_agent_tab" | "focus_agent_tab" | "set_agent_tab" | "reload_tab" | "close_tab" | "get_page_content" | "quick_reply" | "create_post" | "engage_post" | "x_search" | "scroll_page" | "linkedin_people_search" | "linkedin_get_people" | "linkedin_connect" | "linkedin_next_page" | "linkedin_go_to_page";
 export interface GetFeedPostsPayload {
     platform: PlatformType;
     count?: number;
