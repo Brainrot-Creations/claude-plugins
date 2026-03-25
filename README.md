@@ -90,6 +90,9 @@ After `/reload-plugins`, namespaced slash skills are available:
 |-------|------------|---------|
 | **setup** | `/socials-claude-code-plugin:setup` | User-triggered setup / troubleshooting checklist (`disable-model-invocation`). Optional text after the command is treated as a platform hint (`$ARGUMENTS`). |
 | **using-socials** | *(model-invoked)* | Agent Skill: when to use which **`socials_*`** MCP tool and in what order. |
+| **engagement-workflow** | *(model-invoked)* | Agent Skill: find relevant posts and build an engagement routine for growth. |
+| **persona-guide** | *(model-invoked)* | Agent Skill: choose the right persona for content, understand system vs custom personas. |
+| **product-promotion** | *(model-invoked)* | Agent Skill: promote products authentically without being spammy, platform-specific rules. |
 
 ## Claude Code (manual MCP)
 
@@ -137,8 +140,11 @@ socials-claude-code-plugin/
 │   └── plugin.json        # Claude Code plugin manifest
 ├── .mcp.json              # MCP server config for the plugin (${CLAUDE_PLUGIN_ROOT})
 ├── skills/
-│   ├── setup/SKILL.md     # Slash skill — setup & troubleshooting
-│   └── using-socials/SKILL.md  # Agent Skill — MCP tool workflow
+│   ├── setup/SKILL.md           # Slash skill — setup & troubleshooting
+│   ├── using-socials/SKILL.md   # Agent Skill — MCP tool workflow
+│   ├── engagement-workflow/SKILL.md  # Agent Skill — find & engage with posts
+│   ├── persona-guide/SKILL.md   # Agent Skill — choosing personas
+│   └── product-promotion/SKILL.md    # Agent Skill — authentic promotion
 ├── scripts/
 │   └── run-claude-mcp.sh  # Optional launcher for manual MCP (non-plugin) setups
 ├── src/
