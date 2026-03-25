@@ -10,7 +10,7 @@ Answer using a **short checklist** (numbered list). Keep tone friendly and pract
 ## Always mention
 
 1. **Claude** — The Socials Claude Code plugin (or MCP server) must be enabled so the MCP process runs and listens on **127.0.0.1:9847** for the extension.
-2. **Browser** — Install the **Socials** extension (Brainrot Creations), turn **Agent Mode** **ON** in extension settings, and keep a normal browser window open when testing.
+2. **Browser** — Install the **Socials** extension (Brainrot Creations), sign in on a **paid** plan (the MCP bridge does not run on free tier), open the side panel once so the extension loads, and keep a normal browser window open when testing.
 3. **First tool** — Once tools are available, run **`socials_check_access`** to confirm the bridge and extension see each other.
 
 ## If they report port / “already in use”

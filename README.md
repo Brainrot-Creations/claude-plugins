@@ -12,7 +12,7 @@ The repo follows the same layout as [Anthropic’s official plugins](https://git
 |-------------|--------|
 | **Node.js** | v18 or newer |
 | **Socials extension** | Install from the [Chrome Web Store](https://chromewebstore.google.com/) (search for “Socials” by Brainrot Creations, or use the link on [socials.brainrotcreations.com](https://socials.brainrotcreations.com)) |
-| **Agent Mode** | In the extension, enable **Agent Mode** (paid plans where applicable). The extension connects to this MCP over `ws://127.0.0.1:9847`. |
+| **Paid plan** | On a **non-free** Socials plan, the extension connects to this MCP over `ws://127.0.0.1:9847` automatically (no toggle). Free tier cannot use the bridge. |
 | **Claude** | Claude Desktop and/or Claude Code with MCP support |
 
 ## Quick start
@@ -32,7 +32,7 @@ If you **fork** this repo, update the `repository` and `bugs` fields in `package
 
 1. Claude starts this process as an **MCP server** over **stdio**.
 2. The server opens a **WebSocket** on **`127.0.0.1:9847`**.
-3. With Agent Mode on, the Socials extension connects to that socket.
+3. On a paid plan, the Socials extension connects to that socket automatically.
 4. Tool calls from Claude are forwarded to the extension, which controls the browser.
 
 ## Claude Desktop
@@ -126,7 +126,7 @@ Claude config can use `"command": "socials-claude-code-plugin"` and `"args": []`
 | Issue | What to try |
 |-------|-------------|
 | **Port 9847 in use** | `lsof -nP -iTCP:9847` (macOS/Linux) or close duplicate Claude / old `node` processes. Set **`SOCIALS_MCP_RECLAIM_PORT=1`** on the MCP server env if needed. |
-| **Extension not connecting** | Toggle Agent Mode, reload the extension, keep a Socials-supported tab open. |
+| **Extension not connecting** | Confirm you are on a **paid** Socials plan, signed in, extension loaded (open the side panel once), then reload the extension if needed. |
 | **Tools say not Pro / not connected** | Socials **Pro** may be required for some tools; extension must show as connected in **`socials_check_access`**. |
 
 ## Repo layout

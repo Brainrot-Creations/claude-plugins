@@ -192,8 +192,19 @@ export class ExtensionBridge {
         return this.sendRequest("get_settings", undefined);
     }
     // Browser control methods
-    async openTab(url) {
-        return this.sendRequest("open_tab", { url });
+    async openTab(url, focus) {
+        return this.sendRequest("open_tab", { url, focus });
+    }
+    async getAgentTab() {
+        return this.sendRequest("get_agent_tab", undefined);
+    }
+    async focusAgentTab() {
+        return this.sendRequest("focus_agent_tab", undefined);
+    }
+    async setAgentTab(tabId) {
+        return this.sendRequest("set_agent_tab", {
+            tabId,
+        });
     }
     async navigateTo(url, tabId) {
         return this.sendRequest("navigate_to", { url, tabId });
@@ -209,6 +220,15 @@ export class ExtensionBridge {
     }
     async quickReply(postId, content) {
         return this.sendRequest("quick_reply", { postId, content });
+    }
+    async createPost(payload) {
+        return this.sendRequest("create_post", payload);
+    }
+    async engagePost(payload) {
+        return this.sendRequest("engage_post", payload);
+    }
+    async xSearch(payload) {
+        return this.sendRequest("x_search", payload);
     }
     async scrollPage(direction, amount) {
         return this.sendRequest("scroll_page", { direction, amount });

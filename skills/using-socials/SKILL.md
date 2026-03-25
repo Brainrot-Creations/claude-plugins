@@ -10,12 +10,14 @@ Follow this flow unless the user explicitly asks for something else.
 ## 1. Verify connectivity
 
 - Call **`socials_check_access`** first.
-- If the extension is not connected, tell the user to enable **Agent Mode** in Socials and keep the browser open; do not assume tools work until access check succeeds.
+- If the extension is not connected, tell the user they need a **paid** Socials plan (free tier does not connect), to stay signed in, and to keep the browser open with the extension loaded; do not assume tools work until access check succeeds.
 
 ## 2. Open the right context in the browser
 
-- Use **`socials_open_tab`** with a concrete URL before scraping feeds or pages (e.g. `https://x.com/home` for X).
-- Use **`socials_navigate`**, **`socials_reload_tab`**, **`socials_get_active_tab`**, or **`socials_scroll`** when you need to move, refresh, or load more content.
+- Use **`socials_open_tab`** with a concrete URL first. That tab is **pinned** as the Socials **agent tab**: feed, reply, scroll, search, and engage run there even if the user is focused on another tab or another **Chrome window**—automation uses the pinned tab id, not “the focused window.” By default the tab opens in the **background**; use **`focus: true`** to switch to it, or **`socials_focus_agent_tab`** to bring that tab’s window forward. Additional **`socials_open_tab`** calls open in the **same window as the pinned tab** when possible so a new empty window does not hijack the agent workspace.
+- **`socials_get_agent_tab`** — see which tab is pinned. **`socials_set_agent_tab`** — pin an existing tab (e.g. X already open) by `tab_id` from **`socials_get_active_tab`**.
+- Use **`socials_navigate`**, **`socials_reload_tab`**, or **`socials_scroll`** on the agent tab (omit `tab_id` unless targeting a specific tab). **`socials_get_active_tab`** is the **focused** tab (what the user sees), not necessarily the agent tab.
+- **`socials_x_search`** — search on X in the agent tab, then **`socials_get_feed`** / **`socials_quick_reply`** / **`socials_engage_post`** on results.
 
 ## 3. Read content
 

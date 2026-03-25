@@ -29,10 +29,16 @@ export type ExtensionMessageType =
   | "open_tab"
   | "navigate_to"
   | "get_active_tab"
+  | "get_agent_tab"
+  | "focus_agent_tab"
+  | "set_agent_tab"
   | "reload_tab"
   | "close_tab"
   | "get_page_content"
   | "quick_reply"
+  | "create_post"
+  | "engage_post"
+  | "x_search"
   | "scroll_page";
 
 // Payloads for each message type
@@ -58,6 +64,26 @@ export interface SubmitReplyPayload {
   platform: PlatformType;
   postUrl: string;
   replyContent: string;
+}
+
+/** New original post (currently X only; extension validates tab). */
+export interface CreatePostPayload {
+  platform: "x";
+  content: string;
+}
+
+export type EngageActionType = "like" | "repost" | "bookmark" | "share";
+
+/** Like / repost / bookmark / share on a visible X post by tweet id. */
+export interface EngagePostPayload {
+  platform: "x";
+  postId: string;
+  actions: EngageActionType[];
+}
+
+/** Run X top-nav search (Explore / search results). */
+export interface XSearchPayload {
+  query: string;
 }
 
 // Response data types

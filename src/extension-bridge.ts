@@ -14,6 +14,9 @@ import type {
   GetPostContextPayload,
   GenerateReplyPayload,
   SubmitReplyPayload,
+  CreatePostPayload,
+  EngagePostPayload,
+  EngageActionType,
 } from "./types.js";
 
 const BRIDGE_PORT = 9847; // Port for extension to connect to
@@ -257,8 +260,41 @@ export class ExtensionBridge {
   }
 
   // Browser control methods
-  async openTab(url: string): Promise<{ tabId: number; url: string; windowId: number }> {
-    return this.sendRequest<{ tabId: number; url: string; windowId: number }>("open_tab", { url });
+  async openTab(
+    url: string,
+    focus?: boolean
+  ): Promise<{ tabId: number; url: string; windowId: number; agentTabPinned: boolean }> {
+    return this.sendRequest<{ tabId: number; url: string; windowId: number; agentTabPinned: boolean }>(
+      "open_tab",
+      { url, focus }
+    );
+  }
+
+  async getAgentTab(): Promise<{
+    tabId: number;
+    url: string;
+    title: string;
+    platform: string | null;
+  } | null> {
+    return this.sendRequest<{
+      tabId: number;
+      url: string;
+      title: string;
+      platform: string | null;
+    } | null>("get_agent_tab", undefined);
+  }
+
+  async focusAgentTab(): Promise<{ tabId: number; url: string; title: string }> {
+    return this.sendRequest<{ tabId: number; url: string; title: string }>(
+      "focus_agent_tab",
+      undefined
+    );
+  }
+
+  async setAgentTab(tabId: number): Promise<{ tabId: number; url: string; title: string }> {
+    return this.sendRequest<{ tabId: number; url: string; title: string }>("set_agent_tab", {
+      tabId,
+    });
   }
 
   async navigateTo(url: string, tabId?: number): Promise<{ tabId: number; url: string }> {
@@ -292,6 +328,33 @@ export class ExtensionBridge {
 
   async quickReply(postId: string, content: string): Promise<{ success: boolean; error?: string }> {
     return this.sendRequest<{ success: boolean; error?: string }>("quick_reply", { postId, content });
+  }
+
+  async createPost(payload: CreatePostPayload): Promise<{ success: boolean; error?: string }> {
+    return this.sendRequest<{ success: boolean; error?: string }>("create_post", payload);
+  }
+
+  async engagePost(payload: EngagePostPayload): Promise<{
+    success: boolean;
+    results?: Partial<Record<EngageActionType, boolean>>;
+    error?: string;
+  }> {
+    return this.sendRequest<{
+      success: boolean;
+      results?: Partial<Record<EngageActionType, boolean>>;
+      error?: string;
+    }>("engage_post", payload);
+  }
+
+  async xSearch(payload: { query: string }): Promise<{
+    success: boolean;
+    url?: string;
+    error?: string;
+  }> {
+    return this.sendRequest<{ success: boolean; url?: string; error?: string }>(
+      "x_search",
+      payload
+    );
   }
 
   async scrollPage(direction: string, amount: number): Promise<{ success: boolean }> {

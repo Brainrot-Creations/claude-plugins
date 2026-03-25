@@ -21,13 +21,40 @@ const GenerateReplySchema = z.object({
     persona_id: z.string().optional().describe("Persona ID to use for generation"),
     mood: z.string().optional().describe("Mood/tone for the reply (e.g., witty, professional)"),
 });
+const CreatePostSchema = z.object({
+    platform: z.literal("x").describe("Only X (Twitter) is supported for new posts via the extension"),
+    content: z.string().min(1).describe("Full text of the new post (X character limits apply)"),
+});
+const EngagePostSchema = z.object({
+    platform: z.literal("x").describe("Only X is supported for feed engagement via the extension"),
+    post_id: z.string().min(1).describe("Tweet id from socials_get_feed (numeric status id)"),
+    actions: z
+        .array(z.enum(["like", "repost", "bookmark", "share"]))
+        .min(1)
+        .describe("One or more actions to run in order on that tweet. like/repost/bookmark toggle if already engaged. share opens the share menu."),
+});
+const XSearchSchema = z.object({
+    query: z
+        .string()
+        .min(1)
+        .describe('X search text (e.g. "startup", hashtag, or from:user). Submits the top search field and navigates to results.'),
+});
 // Browser control schemas
 const OpenTabSchema = z.object({
     url: z.string().describe("URL to open in new tab"),
+    focus: z
+        .boolean()
+        .optional()
+        .describe("If true, switch Chrome to this tab. Default false: tab opens in the background so you can keep working elsewhere; it becomes the pinned agent tab for all Socials automation."),
 });
 const NavigateToSchema = z.object({
     url: z.string().describe("URL to navigate to"),
-    tab_id: z.number().optional().describe("Tab ID (uses active tab if not provided)"),
+    tab_id: z.number().optional().describe("Tab ID to navigate. If omitted, navigates the pinned agent tab (from socials_open_tab), not necessarily the foreground tab."),
+});
+const SetAgentTabSchema = z.object({
+    tab_id: z
+        .number()
+        .describe("Existing Chrome tab ID to use as the Socials agent tab (from socials_get_active_tab or the tab bar)."),
 });
 const ReloadTabSchema = z.object({
     tab_id: z.number().optional().describe("Tab ID to reload (uses active tab if not provided)"),
@@ -45,8 +72,8 @@ const server = new Server({
 async function requireProAccess() {
     if (!bridge.isConnected()) {
         throw new Error("Socials extension not connected. Please:\n" +
-            "1. Open your browser with the Socials extension installed\n" +
-            "2. Enable 'Agent Mode' in the extension settings");
+            "1. Open your browser with the Socials extension installed (paid plan — free tier cannot use MCP)\n" +
+            "2. Sign in and keep the extension loaded; it connects to Claude Code automatically when this MCP server is running");
     }
     const { isPro, tier } = await bridge.checkProAccess();
     if (!isPro) {
@@ -70,7 +97,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             {
                 name: "socials_get_feed",
                 description: "Get recent posts from a social media feed. Requires Pro access. " +
-                    "The extension must be open on the target platform's feed page.",
+                    "Reads the pinned agent tab (set by socials_open_tab), not the tab you are looking at—so you can use other tabs while Claude uses the social tab in the background.",
                 inputSchema: {
                     type: "object",
                     properties: {
@@ -139,7 +166,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             },
             {
                 name: "socials_quick_reply",
-                description: "Reply to a post directly from the feed WITHOUT navigating away. Clicks reply on the tweet, types the content, and posts. " +
+                description: "Reply from the pinned agent tab's feed (see socials_open_tab)—that tab need not be focused. " +
+                    "Clicks reply on the tweet, types the content, and posts. " +
                     "You can write the reply yourself OR use socials_generate_reply first if you want to use the user's persona. " +
                     "IMPORTANT: Always confirm with the user before posting.",
                 inputSchema: {
@@ -158,6 +186,74 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                 },
             },
             {
+                name: "socials_create_post",
+                description: "Publish a new original post on X (not a reply) in the pinned agent tab (need not be focused). " +
+                    "Opens the compose dialog from the sidebar, fills the text, and clicks Post. " +
+                    "Agent tab should be on X (e.g. https://x.com/home) with the left nav visible. " +
+                    "IMPORTANT: Always confirm the exact text with the user before calling this tool.",
+                inputSchema: {
+                    type: "object",
+                    properties: {
+                        platform: {
+                            type: "string",
+                            enum: ["x"],
+                            description: "Must be x",
+                        },
+                        content: {
+                            type: "string",
+                            description: "Full post body to publish",
+                        },
+                    },
+                    required: ["platform", "content"],
+                },
+            },
+            {
+                name: "socials_engage_post",
+                description: "On X, perform engagement on a tweet visible in the pinned agent tab (home timeline, list, etc.; tab need not be focused). " +
+                    "Uses the tweet id from socials_get_feed. Runs actions in order: like, repost (simple repost, not quote), bookmark, and/or share (opens share menu). " +
+                    "Like/bookmark/repost are toggles on X—calling again may undo. " +
+                    "IMPORTANT: Only use when the user explicitly wants these actions.",
+                inputSchema: {
+                    type: "object",
+                    properties: {
+                        platform: {
+                            type: "string",
+                            enum: ["x"],
+                            description: "Must be x",
+                        },
+                        post_id: {
+                            type: "string",
+                            description: "Tweet status id",
+                        },
+                        actions: {
+                            type: "array",
+                            items: {
+                                type: "string",
+                                enum: ["like", "repost", "bookmark", "share"],
+                            },
+                            description: "Actions to perform, in order",
+                        },
+                    },
+                    required: ["platform", "post_id", "actions"],
+                },
+            },
+            {
+                name: "socials_x_search",
+                description: "On X, run search in the pinned agent tab (not necessarily the focused tab): fills top search and navigates to results (e.g. /search?q=…). " +
+                    "After success, use socials_get_feed, socials_quick_reply, and socials_engage_post on the visible tweets. " +
+                    "If the search box is missing, the extension may navigate the agent tab to https://x.com/explore and retry once.",
+                inputSchema: {
+                    type: "object",
+                    properties: {
+                        query: {
+                            type: "string",
+                            description: "Search string to submit in X's top search box",
+                        },
+                    },
+                    required: ["query"],
+                },
+            },
+            {
                 name: "socials_list_personas",
                 description: "List available personas for content generation. Includes both system personas and user-created custom personas.",
                 inputSchema: {
@@ -169,7 +265,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             // Browser control tools
             {
                 name: "socials_open_tab",
-                description: "Open a new browser tab. ALWAYS use this first before trying to get posts. Example: open https://x.com/home to view X feed.",
+                description: "Open a URL in a new tab and pin it as the Socials agent tab. Feed, reply, scroll, search, and engage tools always target this pinned tab—not whichever tab is focused—so you can browse in other tabs. By default the new tab opens in the background (use focus: true to jump to it).",
                 inputSchema: {
                     type: "object",
                     properties: {
@@ -177,13 +273,17 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                             type: "string",
                             description: "URL to open. Use https://x.com/home for X feed.",
                         },
+                        focus: {
+                            type: "boolean",
+                            description: "If true, activate the new tab and focus the window. Default false (background).",
+                        },
                     },
                     required: ["url"],
                 },
             },
             {
                 name: "socials_navigate",
-                description: "Navigate the current or specified tab to a URL.",
+                description: "Navigate the pinned agent tab (or tab_id if provided) to a URL. Does not require that tab to be active.",
                 inputSchema: {
                     type: "object",
                     properties: {
@@ -193,7 +293,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                         },
                         tab_id: {
                             type: "number",
-                            description: "Tab ID (optional, uses active tab if not provided)",
+                            description: "Optional. If omitted, uses the pinned agent tab from socials_open_tab.",
                         },
                     },
                     required: ["url"],
@@ -201,7 +301,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             },
             {
                 name: "socials_get_active_tab",
-                description: "Get information about the currently active browser tab including URL, title, and detected platform.",
+                description: "Get the currently focused browser tab (what you are looking at). For the tab Claude automates, use socials_get_agent_tab.",
                 inputSchema: {
                     type: "object",
                     properties: {},
@@ -209,14 +309,46 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                 },
             },
             {
-                name: "socials_reload_tab",
-                description: "Reload the current or specified browser tab. Useful after page changes to get fresh content.",
+                name: "socials_get_agent_tab",
+                description: "Get the pinned Socials agent tab (URL, title, platform). Null if none set yet—then call socials_open_tab.",
+                inputSchema: {
+                    type: "object",
+                    properties: {},
+                    required: [],
+                },
+            },
+            {
+                name: "socials_focus_agent_tab",
+                description: "Bring the pinned agent tab to the foreground (same as clicking it). Use when you want to watch what Claude is doing.",
+                inputSchema: {
+                    type: "object",
+                    properties: {},
+                    required: [],
+                },
+            },
+            {
+                name: "socials_set_agent_tab",
+                description: "Pin an existing tab as the agent tab (e.g. you already have X open). Pass tab_id from socials_get_active_tab.",
                 inputSchema: {
                     type: "object",
                     properties: {
                         tab_id: {
                             type: "number",
-                            description: "Tab ID to reload (optional, uses active tab if not provided)",
+                            description: "Chrome tab ID to pin for automation",
+                        },
+                    },
+                    required: ["tab_id"],
+                },
+            },
+            {
+                name: "socials_reload_tab",
+                description: "Reload the pinned agent tab, or tab_id if provided.",
+                inputSchema: {
+                    type: "object",
+                    properties: {
+                        tab_id: {
+                            type: "number",
+                            description: "Optional. If omitted, reloads the pinned agent tab.",
                         },
                     },
                     required: [],
@@ -224,7 +356,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             },
             {
                 name: "socials_get_page_content",
-                description: "Get posts from current page. Use socials_open_tab first to open the social media site.",
+                description: "Get posts from the pinned agent tab (or foreground tab if no pin). Use socials_open_tab first.",
                 inputSchema: {
                     type: "object",
                     properties: {},
@@ -233,7 +365,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             },
             {
                 name: "socials_scroll",
-                description: "Scroll the page to load more posts. Use this to discover new content in the feed.",
+                description: "Scroll the pinned agent tab to load more posts (does not require that tab to be focused).",
                 inputSchema: {
                     type: "object",
                     properties: {
@@ -289,8 +421,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                                     ws_server_listening: true,
                                     extension_connected: false,
                                     action: "MCP is listening; the browser extension has not connected to ws://127.0.0.1:9847. " +
-                                        "Use Chrome/Edge/Brave with Socials installed, open the extension → Settings → turn Agent Mode ON, " +
-                                        "then toggle it off/on or reload the extension. Keep this Claude session open while testing.",
+                                        "Use Chrome/Edge/Brave with Socials installed, sign in on a paid plan (free tier does not connect), " +
+                                        "open the side panel once so the extension loads, then reload the extension if needed. " +
+                                        "Keep this Claude session open while testing.",
                                 }),
                             },
                         ],
@@ -386,6 +519,63 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                     ],
                 };
             }
+            case "socials_create_post": {
+                await requireProAccess();
+                const parsed = CreatePostSchema.parse(args);
+                const result = await bridge.createPost({
+                    platform: parsed.platform,
+                    content: parsed.content,
+                });
+                return {
+                    content: [
+                        {
+                            type: "text",
+                            text: JSON.stringify({
+                                success: result.success,
+                                error: result.error,
+                            }),
+                        },
+                    ],
+                };
+            }
+            case "socials_engage_post": {
+                await requireProAccess();
+                const parsed = EngagePostSchema.parse(args);
+                const result = await bridge.engagePost({
+                    platform: parsed.platform,
+                    postId: parsed.post_id,
+                    actions: parsed.actions,
+                });
+                return {
+                    content: [
+                        {
+                            type: "text",
+                            text: JSON.stringify({
+                                success: result.success,
+                                results: result.results,
+                                error: result.error,
+                            }),
+                        },
+                    ],
+                };
+            }
+            case "socials_x_search": {
+                await requireProAccess();
+                const parsed = XSearchSchema.parse(args);
+                const result = await bridge.xSearch({ query: parsed.query });
+                return {
+                    content: [
+                        {
+                            type: "text",
+                            text: JSON.stringify({
+                                success: result.success,
+                                url: result.url,
+                                error: result.error,
+                            }),
+                        },
+                    ],
+                };
+            }
             case "socials_list_personas": {
                 if (!bridge.isConnected()) {
                     throw new Error("Extension not connected");
@@ -407,7 +597,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             case "socials_open_tab": {
                 await requireProAccess();
                 const parsed = OpenTabSchema.parse(args);
-                const result = await bridge.openTab(parsed.url);
+                const result = await bridge.openTab(parsed.url, parsed.focus);
                 return {
                     content: [
                         {
@@ -416,7 +606,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                                 success: true,
                                 tabId: result.tabId,
                                 url: result.url,
-                                message: `Opened new tab with URL: ${result.url}`,
+                                agentTabPinned: result.agentTabPinned,
+                                message: parsed.focus
+                                    ? `Opened and focused tab ${result.tabId} (${result.url}). This tab is pinned for all Socials automation.`
+                                    : `Opened tab ${result.tabId} in the background (${result.url}). Pinned for automation—you can use other tabs; use socials_focus_agent_tab to view it.`,
                             }),
                         },
                     ],
@@ -457,6 +650,66 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                                 message: result.platform
                                     ? `Active tab is on ${result.platform}: ${result.url}`
                                     : `Active tab: ${result.url} (not a supported social platform)`,
+                            }),
+                        },
+                    ],
+                };
+            }
+            case "socials_get_agent_tab": {
+                if (!bridge.isConnected()) {
+                    throw new Error("Extension not connected");
+                }
+                const agent = await bridge.getAgentTab();
+                return {
+                    content: [
+                        {
+                            type: "text",
+                            text: JSON.stringify(agent
+                                ? {
+                                    tabId: agent.tabId,
+                                    url: agent.url,
+                                    title: agent.title,
+                                    platform: agent.platform,
+                                    message: `Pinned agent tab (Claude uses this for feed/reply/scroll): ${agent.url}`,
+                                }
+                                : {
+                                    agentTab: null,
+                                    message: "No agent tab pinned yet. Call socials_open_tab or socials_set_agent_tab.",
+                                }),
+                        },
+                    ],
+                };
+            }
+            case "socials_focus_agent_tab": {
+                await requireProAccess();
+                const result = await bridge.focusAgentTab();
+                return {
+                    content: [
+                        {
+                            type: "text",
+                            text: JSON.stringify({
+                                tabId: result.tabId,
+                                url: result.url,
+                                title: result.title,
+                                message: "Focused the pinned agent tab.",
+                            }),
+                        },
+                    ],
+                };
+            }
+            case "socials_set_agent_tab": {
+                await requireProAccess();
+                const parsed = SetAgentTabSchema.parse(args);
+                const result = await bridge.setAgentTab(parsed.tab_id);
+                return {
+                    content: [
+                        {
+                            type: "text",
+                            text: JSON.stringify({
+                                tabId: result.tabId,
+                                url: result.url,
+                                title: result.title,
+                                message: `Pinned tab ${result.tabId} as the Socials agent tab.`,
                             }),
                         },
                     ],

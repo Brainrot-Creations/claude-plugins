@@ -1,4 +1,4 @@
-import type { UserInfo, FeedPost, PostContext, PersonaInfo, GenerateResult } from "./types.js";
+import type { UserInfo, FeedPost, PostContext, PersonaInfo, GenerateResult, CreatePostPayload, EngagePostPayload, EngageActionType } from "./types.js";
 export declare class ExtensionBridge {
     private wss;
     /** True after the WebSocket server has bound to BRIDGE_PORT (extension can dial in). */
@@ -31,10 +31,27 @@ export declare class ExtensionBridge {
         personaId: string;
         autoGenerate: boolean;
     }>;
-    openTab(url: string): Promise<{
+    openTab(url: string, focus?: boolean): Promise<{
         tabId: number;
         url: string;
         windowId: number;
+        agentTabPinned: boolean;
+    }>;
+    getAgentTab(): Promise<{
+        tabId: number;
+        url: string;
+        title: string;
+        platform: string | null;
+    } | null>;
+    focusAgentTab(): Promise<{
+        tabId: number;
+        url: string;
+        title: string;
+    }>;
+    setAgentTab(tabId: number): Promise<{
+        tabId: number;
+        url: string;
+        title: string;
     }>;
     navigateTo(url: string, tabId?: number): Promise<{
         tabId: number;
@@ -57,6 +74,22 @@ export declare class ExtensionBridge {
     }>;
     quickReply(postId: string, content: string): Promise<{
         success: boolean;
+        error?: string;
+    }>;
+    createPost(payload: CreatePostPayload): Promise<{
+        success: boolean;
+        error?: string;
+    }>;
+    engagePost(payload: EngagePostPayload): Promise<{
+        success: boolean;
+        results?: Partial<Record<EngageActionType, boolean>>;
+        error?: string;
+    }>;
+    xSearch(payload: {
+        query: string;
+    }): Promise<{
+        success: boolean;
+        url?: string;
         error?: string;
     }>;
     scrollPage(direction: string, amount: number): Promise<{
