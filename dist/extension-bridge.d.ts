@@ -1,4 +1,4 @@
-import type { UserInfo, FeedPost, PostContext, PersonaInfo, GenerateResult, CreatePostPayload, EngagePostPayload, EngageActionType } from "./types.js";
+import type { UserInfo, FeedPost, PostContext, PersonaInfo, GenerateResult, CreatePostPayload, EngagePostPayload, EngageActionType, LinkedInEngagePostPayload, LinkedInEngageActionType } from "./types.js";
 export declare class ExtensionBridge {
     private wss;
     /** True after the WebSocket server has bound to BRIDGE_PORT (extension can dial in). */
@@ -172,6 +172,16 @@ export declare class ExtensionBridge {
     }>;
     linkedinProfileConnect(note?: string): Promise<{
         success: boolean;
+        error?: string;
+    }>;
+    linkedinEngagePost(payload: LinkedInEngagePostPayload): Promise<{
+        success: boolean;
+        results?: Partial<Record<LinkedInEngageActionType, boolean>>;
+        error?: string;
+    }>;
+    linkedinPostsSearch(query: string): Promise<{
+        success: boolean;
+        url?: string;
         error?: string;
     }>;
     stop(): void;

@@ -29,8 +29,9 @@ Ask (if not clear):
 
 ### On LinkedIn
 1. **`socials_open_tab`** with `https://www.linkedin.com/feed/`
-2. **`socials_get_feed`** to scan posts
-3. Prioritize:
+2. **`socials_linkedin_posts_search`** with relevant keywords to find topical content
+3. **`socials_get_feed`** to scan posts (from feed or search results)
+4. Prioritize:
    - Posts from connections or industry leaders
    - Posts with < 50 comments (not saturated)
    - Questions, polls, or discussion starters
@@ -74,7 +75,7 @@ Bad replies:
 
 **Always confirm the exact text before posting.**
 
-Use **`socials_quick_reply`** to post. Optionally use **`socials_engage_post`** to like/repost if the content genuinely resonates.
+Use **`socials_quick_reply`** to post. Optionally use **`socials_engage_post`** (X) or **`socials_linkedin_engage_post`** (LinkedIn) to like/repost if the content genuinely resonates.
 
 ## 6. Suggest a routine
 
@@ -97,3 +98,5 @@ Remind them: quality > quantity. One great reply beats ten generic ones.
 | `socials_generate_reply` | AI-assisted reply (optional) |
 | `socials_quick_reply` | Post the reply |
 | `socials_engage_post` | Like/repost (X only) |
+| `socials_linkedin_posts_search` | Find relevant LinkedIn content |
+| `socials_linkedin_engage_post` | Like/repost (LinkedIn) |

@@ -18,7 +18,7 @@ Follow this flow unless the user explicitly asks for something else.
 - **`socials_get_agent_tab`** — see which tab is pinned. **`socials_set_agent_tab`** — pin an existing tab (e.g. X already open) by `tab_id` from **`socials_get_active_tab`**.
 - Use **`socials_navigate`**, **`socials_reload_tab`**, or **`socials_scroll`** on the agent tab (omit `tab_id` unless targeting a specific tab). **`socials_get_active_tab`** is the **focused** tab (what the user sees), not necessarily the agent tab.
 - **If platform is X:** use **`socials_x_search`** first, then **`socials_get_feed`** / **`socials_quick_reply`** / (optionally) **`socials_engage_post`** on results.
-- **If platform is LinkedIn:** use **`socials_open_tab`** with `https://www.linkedin.com/feed/` and then **`socials_get_feed`** / **`socials_quick_reply`** (optionally **`socials_scroll`**) to work with posts and replies.
+- **If platform is LinkedIn:** use **`socials_open_tab`** with `https://www.linkedin.com/feed/` and then **`socials_get_feed`** / **`socials_quick_reply`** (optionally **`socials_scroll`**) to work with posts and replies. Use **`socials_linkedin_posts_search`** to search for posts, then **`socials_get_feed`** to read results. Use **`socials_linkedin_engage_post`** to like or repost.
 - **If platform is Reddit:** use **`socials_open_tab`** with the subreddit URL and then **`socials_get_feed`** / **`socials_quick_reply`** (optionally **`socials_scroll`**) to work with posts.
 
 ## 3. Read content

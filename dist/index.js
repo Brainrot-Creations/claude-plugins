@@ -65,6 +65,25 @@ const XSearchSchema = z.object({
         .min(1)
         .describe('X search text (e.g. "startup", hashtag, or from:user). Submits the top search field and navigates to results.'),
 });
+const LinkedInEngagePostSchema = z.object({
+    platform: z
+        .literal("linkedin")
+        .describe("Must be linkedin"),
+    post_id: z
+        .string()
+        .min(1)
+        .describe("Post id/urn from socials_get_feed (LinkedIn activity URN or post identifier)"),
+    actions: z
+        .array(z.enum(["like", "repost", "quote_repost"]))
+        .min(1)
+        .describe("One or more actions to run in order on that post. like toggles the reaction. repost performs instant repost. quote_repost opens the quote dialog (repost with your thoughts)."),
+});
+const LinkedInPostsSearchSchema = z.object({
+    query: z
+        .string()
+        .min(1)
+        .describe('LinkedIn content/posts search text (e.g. "founder energy", "startup tips"). Navigates to LinkedIn search results page filtered to Posts.'),
+});
 // Browser control schemas
 const OpenTabSchema = z.object({
     url: z.string().describe("URL to open in new tab"),
@@ -527,6 +546,53 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                         },
                     },
                     required: [],
+                },
+            },
+            // LinkedIn Engagement tools
+            {
+                name: "socials_linkedin_engage_post",
+                description: "On LinkedIn, perform engagement on a post visible in the pinned agent tab (feed, search results, etc.; tab need not be focused). " +
+                    "Uses the post id from socials_get_feed. Runs actions in order: like (toggles reaction), repost (instant repost), quote_repost (opens quote dialog). " +
+                    "Like is a toggle—calling again may undo the reaction. quote_repost returns the sharebox URL. " +
+                    "IMPORTANT: Only use when the user explicitly wants these actions.",
+                inputSchema: {
+                    type: "object",
+                    properties: {
+                        platform: {
+                            type: "string",
+                            enum: ["linkedin"],
+                            description: "Must be linkedin",
+                        },
+                        post_id: {
+                            type: "string",
+                            description: "LinkedIn post id/urn from socials_get_feed",
+                        },
+                        actions: {
+                            type: "array",
+                            items: {
+                                type: "string",
+                                enum: ["like", "repost", "quote_repost"],
+                            },
+                            description: "Actions to perform, in order (like, repost, quote_repost)",
+                        },
+                    },
+                    required: ["platform", "post_id", "actions"],
+                },
+            },
+            // LinkedIn Posts Search
+            {
+                name: "socials_linkedin_posts_search",
+                description: "On LinkedIn, search for posts/content in the pinned agent tab: navigates to search results filtered to Posts (e.g. /search/results/content/?keywords=...). " +
+                    "After success, use socials_get_feed to read the visible posts, then socials_linkedin_engage_post or socials_quick_reply to interact.",
+                inputSchema: {
+                    type: "object",
+                    properties: {
+                        query: {
+                            type: "string",
+                            description: "Search string for LinkedIn posts (e.g. 'founder energy', 'startup tips')",
+                        },
+                    },
+                    required: ["query"],
                 },
             },
         ],
@@ -1076,6 +1142,47 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                                 error: result.error,
                                 message: result.success
                                     ? "Connection request sent successfully"
+                                    : result.error,
+                            }),
+                        },
+                    ],
+                };
+            }
+            case "socials_linkedin_engage_post": {
+                await requireProAccess();
+                const parsed = LinkedInEngagePostSchema.parse(args);
+                const result = await bridge.linkedinEngagePost({
+                    platform: parsed.platform,
+                    postId: parsed.post_id,
+                    actions: parsed.actions,
+                });
+                return {
+                    content: [
+                        {
+                            type: "text",
+                            text: JSON.stringify({
+                                success: result.success,
+                                results: result.results,
+                                error: result.error,
+                            }),
+                        },
+                    ],
+                };
+            }
+            case "socials_linkedin_posts_search": {
+                await requireProAccess();
+                const parsed = LinkedInPostsSearchSchema.parse(args);
+                const result = await bridge.linkedinPostsSearch(parsed.query);
+                return {
+                    content: [
+                        {
+                            type: "text",
+                            text: JSON.stringify({
+                                success: result.success,
+                                url: result.url,
+                                error: result.error,
+                                message: result.success
+                                    ? `Navigated to LinkedIn posts search for "${parsed.query}". Use socials_get_feed to get results.`
                                     : result.error,
                             }),
                         },

@@ -258,6 +258,12 @@ export class ExtensionBridge {
     async linkedinProfileConnect(note) {
         return this.sendRequest("linkedin_profile_connect", { note });
     }
+    async linkedinEngagePost(payload) {
+        return this.sendRequest("linkedin_engage_post", payload);
+    }
+    async linkedinPostsSearch(query) {
+        return this.sendRequest("linkedin_posts_search", { query });
+    }
     stop() {
         this.wsServerListening = false;
         if (this.pingInterval) {

@@ -17,6 +17,8 @@ import type {
   CreatePostPayload,
   EngagePostPayload,
   EngageActionType,
+  LinkedInEngagePostPayload,
+  LinkedInEngageActionType,
 } from "./types.js";
 
 const BRIDGE_PORT = 9847; // Port for extension to connect to
@@ -531,6 +533,29 @@ export class ExtensionBridge {
     return this.sendRequest<{ success: boolean; error?: string }>(
       "linkedin_profile_connect",
       { note }
+    );
+  }
+
+  async linkedinEngagePost(payload: LinkedInEngagePostPayload): Promise<{
+    success: boolean;
+    results?: Partial<Record<LinkedInEngageActionType, boolean>>;
+    error?: string;
+  }> {
+    return this.sendRequest<{
+      success: boolean;
+      results?: Partial<Record<LinkedInEngageActionType, boolean>>;
+      error?: string;
+    }>("linkedin_engage_post", payload);
+  }
+
+  async linkedinPostsSearch(query: string): Promise<{
+    success: boolean;
+    url?: string;
+    error?: string;
+  }> {
+    return this.sendRequest<{ success: boolean; url?: string; error?: string }>(
+      "linkedin_posts_search",
+      { query }
     );
   }
 

@@ -48,7 +48,11 @@ export type ExtensionMessageType =
   | "linkedin_go_to_page"
   // LinkedIn Profile
   | "linkedin_get_profile"
-  | "linkedin_profile_connect";
+  | "linkedin_profile_connect"
+  // LinkedIn Engagement
+  | "linkedin_engage_post"
+  // LinkedIn Search
+  | "linkedin_posts_search";
 
 // Payloads for each message type
 export interface GetFeedPostsPayload {
@@ -88,6 +92,15 @@ export interface EngagePostPayload {
   platform: "x";
   postId: string;
   actions: EngageActionType[];
+}
+
+export type LinkedInEngageActionType = "like" | "repost" | "quote_repost";
+
+/** Like / repost / quote_repost on a visible LinkedIn post by post id/urn. */
+export interface LinkedInEngagePostPayload {
+  platform: "linkedin";
+  postId: string;
+  actions: LinkedInEngageActionType[];
 }
 
 /** Run X top-nav search (Explore / search results). */
