@@ -524,7 +524,8 @@ async function captureAsync(event: string, properties: EventProperties = {}): Pr
   const distinctId = getDistinctId();
 
   try {
-    await posthog.captureImmediate({
+    // Use capture + flush for reliable delivery
+    posthog.capture({
       distinctId,
       event,
       properties: {
@@ -561,8 +562,10 @@ async function captureAsync(event: string, properties: EventProperties = {}): Pr
         ...properties,
       },
     });
-  } catch {
-    // Silent fail - analytics shouldn't break the app
+    // Force flush to send immediately
+    await posthog.flush();
+  } catch (error) {
+    console.error(`[posthog] capture failed for ${event}:`, error);
   }
 }
 

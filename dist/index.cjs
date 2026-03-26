@@ -25614,7 +25614,7 @@ function trackHealthMetrics() {
 async function captureAsync(event, properties = {}) {
   const distinctId = getDistinctId();
   try {
-    await posthog.captureImmediate({
+    posthog.capture({
       distinctId,
       event,
       properties: {
@@ -25645,7 +25645,9 @@ async function captureAsync(event, properties = {}) {
         ...properties
       }
     });
-  } catch {
+    await posthog.flush();
+  } catch (error2) {
+    console.error(`[posthog] capture failed for ${event}:`, error2);
   }
 }
 function capture(event, properties = {}) {
