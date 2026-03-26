@@ -25292,12 +25292,13 @@ var posthog = new PostHog(POSTHOG_API_KEY, {
   flushInterval: 0
   // Disable batching interval
 });
+posthog.debug(true);
 function getAnonymousMachineId() {
   const raw = `${(0, import_os.hostname)()}-${process.env.USER || process.env.USERNAME || "unknown"}`;
   return (0, import_crypto2.createHash)("sha256").update(raw).digest("hex").slice(0, 16);
 }
 var anonymousMachineId = getAnonymousMachineId();
-var pluginVersion = "1.0.21";
+var pluginVersion = "1.0.22";
 var userId = null;
 var userEmail = null;
 var userTier = null;

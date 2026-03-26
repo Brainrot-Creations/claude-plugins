@@ -18,6 +18,9 @@ const posthog = new PostHog(POSTHOG_API_KEY, {
   flushInterval: 0, // Disable batching interval
 });
 
+// Enable debug logging for PostHog - logs to console
+posthog.debug(true);
+
 // Generate anonymous machine ID (hash of hostname + username) - fallback only
 function getAnonymousMachineId(): string {
   const raw = `${hostname()}-${process.env.USER || process.env.USERNAME || "unknown"}`;
@@ -25,7 +28,7 @@ function getAnonymousMachineId(): string {
 }
 
 const anonymousMachineId = getAnonymousMachineId();
-const pluginVersion = "1.0.21";
+const pluginVersion = "1.0.22";
 
 // User identity from extension (set when extension connects)
 let userId: string | null = null;
