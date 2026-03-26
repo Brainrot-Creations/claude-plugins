@@ -2,7 +2,7 @@
 
 ## What this project does
 
-- **Socials Claude Code plugin** (npm: `socials-claude-code-plugin`) runs on your computer and listens on **`127.0.0.1:9847`** for a single WebSocket client (the Socials browser extension).
+- **Socials Claude Code plugin** (npm: `claude-plugins`) runs on your computer and listens on **`127.0.0.1:9847`** for a single WebSocket client (the Socials browser extension).
 - It does **not** ship API keys for your backend; the extension uses its own session with Socials services.
 
 ## Local trust model

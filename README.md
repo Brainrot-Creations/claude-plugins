@@ -3,7 +3,7 @@
 ## Quick Install (copy this to Claude Code)
 
 ```
-Clone https://github.com/BrainrotCreations/socials-claude-code-plugin, run npm install && npm run build, then add it to my plugins in settings.json
+Clone https://github.com/BrainrotCreations/claude-plugins, run npm install && npm run build, then add it to my plugins in settings.json
 ```
 
 ---
@@ -12,7 +12,7 @@ Clone https://github.com/BrainrotCreations/socials-claude-code-plugin, run npm i
 
 The repo follows the same layout as [Anthropic’s official plugins](https://github.com/anthropics/claude-code/tree/main/plugins): `.claude-plugin/plugin.json` plus root `.mcp.json` so enabling the plugin starts the MCP server automatically. You can still run it as a plain stdio MCP server (Desktop or manual Claude Code config).
 
-**Former name:** this project used to be published as **`socials-mcp`**; the GitHub repository is now **`BrainrotCreations/socials-claude-code-plugin`**.
+**Former name:** this project used to be published as **`socials-mcp`**; the GitHub repository is now **`BrainrotCreations/claude-plugins`**.
 
 ## What you need
 
@@ -26,8 +26,8 @@ The repo follows the same layout as [Anthropic’s official plugins](https://git
 ## Quick start
 
 ```bash
-git clone https://github.com/BrainrotCreations/socials-claude-code-plugin.git
-cd socials-claude-code-plugin
+git clone https://github.com/BrainrotCreations/claude-plugins.git
+cd claude-plugins
 npm install
 npm run build
 ```
@@ -57,7 +57,7 @@ If you **fork** this repo, update the `repository` and `bugs` fields in `package
   "mcpServers": {
     "socials": {
       "command": "node",
-      "args": ["/absolute/path/to/socials-claude-code-plugin/dist/index.js"]
+      "args": ["/absolute/path/to/claude-plugins/dist/index.js"]
     }
   }
 }
@@ -80,8 +80,8 @@ This matches the [plugin directory structure](https://github.com/anthropics/clau
 1. Clone and build the repository:
 
    ```bash
-   git clone https://github.com/BrainrotCreations/socials-claude-code-plugin.git
-   cd socials-claude-code-plugin
+   git clone https://github.com/BrainrotCreations/claude-plugins.git
+   cd claude-plugins
    npm install
    npm run build
    ```
@@ -94,14 +94,14 @@ This matches the [plugin directory structure](https://github.com/anthropics/clau
 
    ```json
    {
-     "plugins": ["/absolute/path/to/socials-claude-code-plugin"]
+     "plugins": ["/absolute/path/to/claude-plugins"]
    }
    ```
 
    **Option B: Load for current session only**
 
    ```bash
-   claude --plugin-dir /absolute/path/to/socials-claude-code-plugin
+   claude --plugin-dir /absolute/path/to/claude-plugins
    ```
 
 3. Enable the **socials** plugin. The bundled `.mcp.json` starts **`node ${CLAUDE_PLUGIN_ROOT}/dist/index.js`** with **`SOCIALS_MCP_RECLAIM_PORT=1`** (see [plugin MCP docs](https://code.claude.com/docs/en/plugins-reference.md#mcp-servers)).
@@ -142,7 +142,7 @@ Add a **stdio** MCP server that runs Node against **`dist/index.js`** if you are
   "mcpServers": {
     "socials": {
       "command": "node",
-      "args": ["/absolute/path/to/socials-claude-code-plugin/dist/index.js"],
+      "args": ["/absolute/path/to/claude-plugins/dist/index.js"],
       "env": {
         "SOCIALS_MCP_RECLAIM_PORT": "1"
       }
@@ -174,7 +174,7 @@ Claude config can use `"command": "socials"` and `"args": []` if the binary reso
 ## Repo layout
 
 ```
-socials-claude-code-plugin/
+claude-plugins/
 ├── .claude-plugin/
 │   └── plugin.json        # Claude Code plugin manifest
 ├── .mcp.json              # MCP server config for the plugin (${CLAUDE_PLUGIN_ROOT})

@@ -21533,7 +21533,683 @@ var import_websocket = __toESM(require_websocket(), 1);
 var import_websocket_server = __toESM(require_websocket_server(), 1);
 
 // src/extension-bridge.ts
+var import_crypto2 = require("crypto");
+
+// src/analytics.ts
 var import_crypto = require("crypto");
+var import_os = require("os");
+var POSTHOG_HOST = process.env.POSTHOG_HOST || "https://us.i.posthog.com";
+var POSTHOG_API_KEY = process.env.POSTHOG_API_KEY || "phc_NxYGkalAkiTBbZOuQChvvHnfRBL7MJABKCuTVXdbyz4";
+function getAnonymousMachineId() {
+  const raw = `${(0, import_os.hostname)()}-${process.env.USER || process.env.USERNAME || "unknown"}`;
+  return (0, import_crypto.createHash)("sha256").update(raw).digest("hex").slice(0, 16);
+}
+var anonymousMachineId = getAnonymousMachineId();
+var pluginVersion = "1.0.16";
+var userId = null;
+var userEmail = null;
+var userTier = null;
+var sessionStartTime = null;
+var lastToolName = null;
+var toolCallCount = 0;
+var sessionPostsCreated = 0;
+var sessionRepliesSent = 0;
+var sessionEngagements = 0;
+var sessionSearches = 0;
+var sessionProfileViews = 0;
+var sessionConnectionRequests = 0;
+var lastExtensionLatencyMs = null;
+var totalEventsQueued = 0;
+var totalEventsSent = 0;
+var totalEventsFailed = 0;
+var featureFlagsCache = {};
+var featureFlagsFetchedAt = null;
+var FEATURE_FLAGS_TTL = 5 * 60 * 1e3;
+function setUserIdentity(id, email2, tier) {
+  const previousId = userId ? null : `anon_${anonymousMachineId}`;
+  userId = id;
+  userEmail = email2 || null;
+  userTier = tier || null;
+  sessionStartTime = Date.now();
+  toolCallCount = 0;
+  sessionPostsCreated = 0;
+  sessionRepliesSent = 0;
+  sessionEngagements = 0;
+  sessionSearches = 0;
+  sessionProfileViews = 0;
+  sessionConnectionRequests = 0;
+  identify(previousId);
+  fetchFeatureFlags();
+}
+function clearUserIdentity() {
+  if (userId) {
+    const score = calculateEngagementScore();
+    capture("mcp_session_engagement_score", {
+      engagement_score: score.score,
+      engagement_level: score.level,
+      ...score.breakdown
+    });
+  }
+  userId = null;
+  userEmail = null;
+  userTier = null;
+  sessionStartTime = null;
+  lastToolName = null;
+  toolCallCount = 0;
+  featureFlagsCache = {};
+  featureFlagsFetchedAt = null;
+}
+function getDistinctId() {
+  return userId || `anon_${anonymousMachineId}`;
+}
+async function fetchFeatureFlags() {
+  try {
+    const response = await fetch(`${POSTHOG_HOST}/decide/?v=3`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        api_key: POSTHOG_API_KEY,
+        distinct_id: getDistinctId(),
+        person_properties: {
+          email: userEmail,
+          tier: userTier
+        },
+        groups: userTier ? { subscription_tier: userTier } : void 0
+      })
+    });
+    if (response.ok) {
+      const data = await response.json();
+      featureFlagsCache = data.featureFlags || {};
+      featureFlagsFetchedAt = Date.now();
+    }
+  } catch {
+  }
+}
+function isFeatureEnabled(flagName, defaultValue = false) {
+  if (!featureFlagsFetchedAt || Date.now() - featureFlagsFetchedAt > FEATURE_FLAGS_TTL) {
+    fetchFeatureFlags();
+  }
+  const value = featureFlagsCache[flagName];
+  if (value === void 0) return defaultValue;
+  return value === true || value === "true";
+}
+var PlatformFlags = {
+  x: "mcp_platform_x",
+  linkedin: "mcp_platform_linkedin",
+  reddit: "mcp_platform_reddit"
+};
+var ToolFlags = {
+  // Core tools (always on by default)
+  socials_check_access: "mcp_tool_check_access",
+  socials_diagnostics: "mcp_tool_diagnostics",
+  socials_list_personas: "mcp_tool_list_personas",
+  // X (Twitter) tools
+  socials_get_feed: "mcp_tool_get_feed",
+  socials_get_post_context: "mcp_tool_get_post_context",
+  socials_generate_reply: "mcp_tool_generate_reply",
+  socials_quick_reply: "mcp_tool_quick_reply",
+  socials_create_post: "mcp_tool_create_post",
+  socials_engage_post: "mcp_tool_engage_post",
+  socials_x_search: "mcp_tool_x_search",
+  // Browser control tools
+  socials_open_tab: "mcp_tool_open_tab",
+  socials_navigate: "mcp_tool_navigate",
+  socials_get_active_tab: "mcp_tool_get_active_tab",
+  socials_get_agent_tab: "mcp_tool_get_agent_tab",
+  socials_focus_agent_tab: "mcp_tool_focus_agent_tab",
+  socials_set_agent_tab: "mcp_tool_set_agent_tab",
+  socials_reload_tab: "mcp_tool_reload_tab",
+  socials_get_page_content: "mcp_tool_get_page_content",
+  socials_scroll: "mcp_tool_scroll",
+  // LinkedIn tools
+  socials_linkedin_people_search: "mcp_tool_linkedin_people_search",
+  socials_linkedin_get_people: "mcp_tool_linkedin_get_people",
+  socials_linkedin_next_page: "mcp_tool_linkedin_next_page",
+  socials_linkedin_go_to_page: "mcp_tool_linkedin_go_to_page",
+  socials_linkedin_posts_search: "mcp_tool_linkedin_posts_search",
+  socials_linkedin_connect: "mcp_tool_linkedin_connect",
+  socials_linkedin_profile: "mcp_tool_linkedin_profile",
+  socials_linkedin_connection_status: "mcp_tool_linkedin_connection_status",
+  socials_linkedin_engage: "mcp_tool_linkedin_engage",
+  socials_linkedin_create_post: "mcp_tool_linkedin_create_post"
+};
+var ToolPlatformMap = {
+  // Core tools (no platform)
+  socials_check_access: "core",
+  socials_diagnostics: "core",
+  socials_list_personas: "core",
+  // Browser tools (no platform)
+  socials_open_tab: "browser",
+  socials_navigate: "browser",
+  socials_get_active_tab: "browser",
+  socials_get_agent_tab: "browser",
+  socials_focus_agent_tab: "browser",
+  socials_set_agent_tab: "browser",
+  socials_reload_tab: "browser",
+  socials_get_page_content: "browser",
+  socials_scroll: "browser",
+  // X tools
+  socials_get_feed: "x",
+  // Also used for LinkedIn, handled separately
+  socials_get_post_context: "x",
+  socials_generate_reply: "x",
+  socials_quick_reply: "x",
+  socials_create_post: "x",
+  socials_engage_post: "x",
+  socials_x_search: "x",
+  // LinkedIn tools
+  socials_linkedin_people_search: "linkedin",
+  socials_linkedin_get_people: "linkedin",
+  socials_linkedin_next_page: "linkedin",
+  socials_linkedin_go_to_page: "linkedin",
+  socials_linkedin_posts_search: "linkedin",
+  socials_linkedin_connect: "linkedin",
+  socials_linkedin_profile: "linkedin",
+  socials_linkedin_connection_status: "linkedin",
+  socials_linkedin_engage: "linkedin",
+  socials_linkedin_create_post: "linkedin"
+};
+function isPlatformEnabled(platform) {
+  const flagName = PlatformFlags[platform];
+  return isFeatureEnabled(flagName, true);
+}
+function isToolEnabled(toolName) {
+  const platform = ToolPlatformMap[toolName];
+  if (platform && platform !== "core" && platform !== "browser") {
+    if (!isPlatformEnabled(platform)) {
+      return false;
+    }
+  }
+  const toolFlag = ToolFlags[toolName];
+  if (toolFlag) {
+    return isFeatureEnabled(toolFlag, true);
+  }
+  return true;
+}
+function getDisabledTools() {
+  return Object.keys(ToolFlags).filter((tool) => !isToolEnabled(tool));
+}
+function getFeatureGatingStatus() {
+  const platforms = {
+    x: isPlatformEnabled("x"),
+    linkedin: isPlatformEnabled("linkedin"),
+    reddit: isPlatformEnabled("reddit")
+  };
+  const tools = {};
+  for (const toolName of Object.keys(ToolFlags)) {
+    tools[toolName] = isToolEnabled(toolName);
+  }
+  return {
+    platforms,
+    tools,
+    disabled_tools: getDisabledTools()
+  };
+}
+function calculateEngagementScore() {
+  const weights = {
+    posts: 15,
+    // High value - creating content
+    replies: 10,
+    // High value - engagement
+    engagements: 3,
+    // Medium value - likes/reposts
+    searches: 2,
+    // Lower value - discovery
+    profileViews: 2,
+    // Lower value - research
+    connections: 8,
+    // High value - networking
+    sessionDuration: 10,
+    // Value sustained usage
+    toolDiversity: 10
+    // Value using multiple features
+  };
+  const postsScore = Math.min(sessionPostsCreated * weights.posts, 30);
+  const repliesScore = Math.min(sessionRepliesSent * weights.replies, 30);
+  const engagementsScore = Math.min(sessionEngagements * weights.engagements, 15);
+  const searchesScore = Math.min(sessionSearches * weights.searches, 10);
+  const profileViewsScore = Math.min(sessionProfileViews * weights.profileViews, 10);
+  const connectionsScore = Math.min(sessionConnectionRequests * weights.connections, 24);
+  const sessionDurationMin = sessionStartTime ? (Date.now() - sessionStartTime) / 6e4 : 0;
+  const sessionDurationScore = Math.min(sessionDurationMin / 3, weights.sessionDuration);
+  const uniqueActivities = [
+    sessionPostsCreated > 0,
+    sessionRepliesSent > 0,
+    sessionEngagements > 0,
+    sessionSearches > 0,
+    sessionProfileViews > 0,
+    sessionConnectionRequests > 0
+  ].filter(Boolean).length;
+  const toolDiversityScore = uniqueActivities / 6 * weights.toolDiversity;
+  const totalScore = Math.min(
+    postsScore + repliesScore + engagementsScore + searchesScore + profileViewsScore + connectionsScore + sessionDurationScore + toolDiversityScore,
+    100
+  );
+  let level;
+  if (totalScore === 0) level = "inactive";
+  else if (totalScore < 15) level = "low";
+  else if (totalScore < 35) level = "medium";
+  else if (totalScore < 60) level = "high";
+  else level = "power_user";
+  return {
+    score: Math.round(totalScore * 10) / 10,
+    level,
+    breakdown: {
+      posts_score: Math.round(postsScore * 10) / 10,
+      replies_score: Math.round(repliesScore * 10) / 10,
+      engagements_score: Math.round(engagementsScore * 10) / 10,
+      searches_score: Math.round(searchesScore * 10) / 10,
+      profile_views_score: Math.round(profileViewsScore * 10) / 10,
+      connections_score: Math.round(connectionsScore * 10) / 10,
+      session_duration_score: Math.round(sessionDurationScore * 10) / 10,
+      tool_diversity_score: Math.round(toolDiversityScore * 10) / 10
+    }
+  };
+}
+function getEngagementScore() {
+  return calculateEngagementScore();
+}
+function getHealthMetrics() {
+  const memUsage = process.memoryUsage();
+  const totalEvents = totalEventsSent + totalEventsFailed;
+  return {
+    memory_usage_mb: Math.round(memUsage.rss / 1024 / 1024 * 100) / 100,
+    memory_heap_used_mb: Math.round(memUsage.heapUsed / 1024 / 1024 * 100) / 100,
+    memory_heap_total_mb: Math.round(memUsage.heapTotal / 1024 / 1024 * 100) / 100,
+    memory_external_mb: Math.round(memUsage.external / 1024 / 1024 * 100) / 100,
+    uptime_seconds: Math.round(process.uptime()),
+    events_queued: totalEventsQueued,
+    events_sent: totalEventsSent,
+    events_failed: totalEventsFailed,
+    event_success_rate: totalEvents > 0 ? Math.round(totalEventsSent / totalEvents * 100) : 100,
+    last_extension_latency_ms: lastExtensionLatencyMs,
+    feature_flags_cached: Object.keys(featureFlagsCache).length,
+    feature_flags_age_seconds: featureFlagsFetchedAt ? Math.round((Date.now() - featureFlagsFetchedAt) / 1e3) : null
+  };
+}
+function recordExtensionLatency(latencyMs) {
+  lastExtensionLatencyMs = latencyMs;
+}
+function trackHealthMetrics() {
+  const health = getHealthMetrics();
+  const engagement = calculateEngagementScore();
+  capture("mcp_health_check", {
+    ...health,
+    engagement_score: engagement.score,
+    engagement_level: engagement.level
+  });
+}
+function identify(previousDistinctId) {
+  try {
+    const distinctId = getDistinctId();
+    const payload = {
+      api_key: POSTHOG_API_KEY,
+      distinct_id: distinctId,
+      timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+      $set: {
+        email: userEmail,
+        tier: userTier,
+        user_id: userId,
+        plugin_version: pluginVersion,
+        os_platform: process.platform,
+        last_seen_plugin: (/* @__PURE__ */ new Date()).toISOString()
+      },
+      $set_once: {
+        first_seen_plugin: (/* @__PURE__ */ new Date()).toISOString(),
+        initial_tier: userTier,
+        initial_plugin_version: pluginVersion
+      }
+    };
+    totalEventsQueued++;
+    fetch(`${POSTHOG_HOST}/capture/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ...payload,
+        event: "$identify"
+      })
+    }).then(() => {
+      totalEventsSent++;
+    }).catch(() => {
+      totalEventsFailed++;
+    });
+    if (previousDistinctId && userId) {
+      totalEventsQueued++;
+      fetch(`${POSTHOG_HOST}/capture/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          api_key: POSTHOG_API_KEY,
+          event: "$create_alias",
+          distinct_id: userId,
+          properties: {
+            alias: previousDistinctId
+          }
+        })
+      }).then(() => {
+        totalEventsSent++;
+      }).catch(() => {
+        totalEventsFailed++;
+      });
+    }
+  } catch {
+    totalEventsFailed++;
+  }
+}
+function capture(event, properties = {}) {
+  try {
+    const distinctId = getDistinctId();
+    const engagement = calculateEngagementScore();
+    const health = getHealthMetrics();
+    const payload = {
+      api_key: POSTHOG_API_KEY,
+      event,
+      distinct_id: distinctId,
+      timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+      properties: {
+        // Product identification
+        product: "socials",
+        source: "claude-plugins",
+        plugin_version: pluginVersion,
+        // Environment info
+        os_platform: process.platform,
+        node_version: process.version,
+        // User context
+        has_user_identity: !!userId,
+        user_tier: userTier,
+        // Session context
+        session_tool_count: toolCallCount,
+        session_duration_ms: sessionStartTime ? Date.now() - sessionStartTime : null,
+        // Tool sequence tracking (for funnels)
+        previous_tool: lastToolName,
+        // Engagement score (included on all events)
+        engagement_score: engagement.score,
+        engagement_level: engagement.level,
+        // Health metrics (lightweight subset)
+        memory_mb: health.memory_usage_mb,
+        extension_latency_ms: health.last_extension_latency_ms,
+        // Group analytics - group by tier for cohort analysis
+        $groups: userTier ? { subscription_tier: userTier } : void 0,
+        // Event-specific properties
+        ...properties
+      }
+    };
+    totalEventsQueued++;
+    fetch(`${POSTHOG_HOST}/capture/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    }).then(() => {
+      totalEventsSent++;
+    }).catch(() => {
+      totalEventsFailed++;
+    });
+  } catch {
+    totalEventsFailed++;
+  }
+}
+function incrementUserProperty(property, amount = 1) {
+  if (!userId) return;
+  try {
+    totalEventsQueued++;
+    fetch(`${POSTHOG_HOST}/capture/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        api_key: POSTHOG_API_KEY,
+        event: "$set",
+        distinct_id: getDistinctId(),
+        $set: {
+          [property]: { $increment: amount }
+        }
+      })
+    }).then(() => {
+      totalEventsSent++;
+    }).catch(() => {
+      totalEventsFailed++;
+    });
+  } catch {
+    totalEventsFailed++;
+  }
+}
+function categorizeError(errorMessage) {
+  const msg = errorMessage.toLowerCase();
+  if (msg.includes("not connected") || msg.includes("connection") || msg.includes("websocket")) {
+    return "connection";
+  }
+  if (msg.includes("pro access") || msg.includes("paid plan") || msg.includes("permission") || msg.includes("allowlist")) {
+    return "permission";
+  }
+  if (msg.includes("timeout") || msg.includes("timed out")) {
+    return "timeout";
+  }
+  if (msg.includes("rate limit") || msg.includes("too many")) {
+    return "rate_limit";
+  }
+  if (msg.includes("not found") || msg.includes("404")) {
+    return "not_found";
+  }
+  if (msg.includes("invalid") || msg.includes("required") || msg.includes("must be")) {
+    return "validation";
+  }
+  if (msg.includes("extension")) {
+    return "extension";
+  }
+  return "unknown";
+}
+function analyzeContent(content) {
+  const hashtags = content.match(/#\w+/g) || [];
+  const mentions = content.match(/@\w+/g) || [];
+  const urls = content.match(/https?:\/\/[^\s]+/g) || [];
+  const hasEmoji = /[\u{1F300}-\u{1F9FF}]|[\u{2600}-\u{26FF}]/u.test(content);
+  const words = content.trim().split(/\s+/).filter((w) => w.length > 0);
+  return {
+    hashtag_count: hashtags.length,
+    hashtags: hashtags.slice(0, 5),
+    // Limit to 5
+    mention_count: mentions.length,
+    mentions: mentions.slice(0, 5),
+    url_count: urls.length,
+    has_emoji: hasEmoji,
+    word_count: words.length,
+    character_count: content.length
+  };
+}
+function createTimer() {
+  const start = Date.now();
+  return () => Date.now() - start;
+}
+function trackServerStart() {
+  capture("mcp_server_started", {
+    machine_id: anonymousMachineId
+  });
+}
+function trackExtensionConnected(tier) {
+  capture("mcp_extension_connected", {
+    tier: tier || "unknown"
+  });
+  if (userId) {
+    incrementUserProperty("total_sessions");
+  }
+}
+function trackExtensionDisconnected() {
+  const sessionDurationMs = sessionStartTime ? Date.now() - sessionStartTime : null;
+  const engagement = calculateEngagementScore();
+  capture("mcp_extension_disconnected", {
+    session_duration_ms: sessionDurationMs,
+    session_duration_min: sessionDurationMs ? Math.round(sessionDurationMs / 6e4) : null,
+    session_tool_count: toolCallCount,
+    final_engagement_score: engagement.score,
+    final_engagement_level: engagement.level
+  });
+}
+function trackToolUsage(toolName, platform, success = true, durationMs) {
+  toolCallCount++;
+  capture("mcp_tool_called", {
+    tool: toolName,
+    social_platform: platform || "unknown",
+    success,
+    duration_ms: durationMs,
+    is_slow: durationMs ? durationMs > 5e3 : void 0
+    // Flag slow calls (>5s)
+  });
+  lastToolName = toolName;
+  if (userId && success) {
+    incrementUserProperty("total_tool_calls");
+    incrementUserProperty(`tool_${toolName}_count`);
+  }
+}
+function trackError(toolName, errorMessage) {
+  const category = categorizeError(errorMessage);
+  capture("mcp_tool_error", {
+    tool: toolName,
+    error: errorMessage.slice(0, 200),
+    error_category: category
+  });
+  if (userId) {
+    incrementUserProperty("total_errors");
+    incrementUserProperty(`error_${category}_count`);
+  }
+}
+function trackPostCreated(platform, content, success, durationMs) {
+  const insights = analyzeContent(content);
+  if (success) sessionPostsCreated++;
+  capture("mcp_post_created", {
+    social_platform: platform,
+    success,
+    duration_ms: durationMs,
+    ...insights
+  });
+  if (userId && success) {
+    incrementUserProperty("total_posts_created");
+    incrementUserProperty(`posts_${platform}_count`);
+  }
+}
+function trackReplySent(platform, content, success, durationMs) {
+  const insights = analyzeContent(content);
+  if (success) sessionRepliesSent++;
+  capture("mcp_reply_sent", {
+    social_platform: platform,
+    success,
+    duration_ms: durationMs,
+    ...insights
+  });
+  if (userId && success) {
+    incrementUserProperty("total_replies_sent");
+    incrementUserProperty(`replies_${platform}_count`);
+  }
+}
+function trackEngagement(platform, actions, success, durationMs) {
+  if (success) sessionEngagements += actions.length;
+  capture("mcp_engagement_action", {
+    social_platform: platform,
+    actions: actions.join(","),
+    action_count: actions.length,
+    has_like: actions.includes("like"),
+    has_repost: actions.includes("repost"),
+    has_bookmark: actions.includes("bookmark"),
+    success,
+    duration_ms: durationMs
+  });
+  if (userId && success) {
+    incrementUserProperty("total_engagements");
+    actions.forEach((action) => {
+      incrementUserProperty(`engagement_${action}_count`);
+    });
+  }
+}
+function trackSearch(platform, searchType, success, durationMs) {
+  if (success) sessionSearches++;
+  capture("mcp_search_performed", {
+    social_platform: platform,
+    search_type: searchType,
+    success,
+    duration_ms: durationMs
+  });
+  if (userId && success) {
+    incrementUserProperty("total_searches");
+    incrementUserProperty(`searches_${platform}_count`);
+  }
+}
+function trackProfileViewed(success, durationMs) {
+  if (success) sessionProfileViews++;
+  capture("mcp_profile_viewed", {
+    social_platform: "linkedin",
+    success,
+    duration_ms: durationMs
+  });
+  if (userId && success) {
+    incrementUserProperty("total_profiles_viewed");
+  }
+}
+function trackConnectionRequest(success, hasNote, durationMs) {
+  if (success) sessionConnectionRequests++;
+  capture("mcp_connection_request", {
+    social_platform: "linkedin",
+    success,
+    has_note: hasNote,
+    duration_ms: durationMs
+  });
+  if (userId && success) {
+    incrementUserProperty("total_connection_requests");
+    if (hasNote) {
+      incrementUserProperty("connection_requests_with_note");
+    }
+  }
+}
+function trackPersonaUsed(personaId, personaName) {
+  capture("mcp_persona_used", {
+    persona_id: personaId,
+    persona_name: personaName,
+    is_custom: !personaId.startsWith("system_")
+  });
+  if (userId) {
+    incrementUserProperty("total_persona_uses");
+    incrementUserProperty(`persona_${personaId}_uses`);
+  }
+}
+function trackFeedViewed(platform, postCount, durationMs) {
+  capture("mcp_feed_viewed", {
+    social_platform: platform,
+    post_count: postCount,
+    duration_ms: durationMs
+  });
+  if (userId) {
+    incrementUserProperty("total_feeds_viewed");
+    incrementUserProperty(`feeds_${platform}_count`);
+  }
+}
+function updateTierGroupProperties() {
+  if (!userTier) return;
+  try {
+    totalEventsQueued++;
+    fetch(`${POSTHOG_HOST}/capture/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        api_key: POSTHOG_API_KEY,
+        event: "$groupidentify",
+        distinct_id: getDistinctId(),
+        properties: {
+          $group_type: "subscription_tier",
+          $group_key: userTier,
+          $group_set: {
+            name: userTier,
+            updated_at: (/* @__PURE__ */ new Date()).toISOString()
+          }
+        }
+      })
+    }).then(() => {
+      totalEventsSent++;
+    }).catch(() => {
+      totalEventsFailed++;
+    });
+  } catch {
+    totalEventsFailed++;
+  }
+}
+
+// src/extension-bridge.ts
 var BRIDGE_PORT = 9847;
 var BRIDGE_HOST = "127.0.0.1";
 var PING_INTERVAL = 3e4;
@@ -21591,6 +22267,8 @@ var ExtensionBridge = class {
             console.error("[ExtensionBridge] Extension disconnected");
             if (this.client === ws) {
               this.client = null;
+              trackExtensionDisconnected();
+              clearUserIdentity();
             }
           });
           ws.on("error", (error2) => {
@@ -21615,7 +22293,10 @@ var ExtensionBridge = class {
     }
     this.pingInterval = setInterval(() => {
       if (this.client?.readyState === import_websocket.default.OPEN) {
-        this.sendRequest("ping", void 0).catch(() => {
+        const pingStart = Date.now();
+        this.sendRequest("ping", void 0).then(() => {
+          recordExtensionLatency(Date.now() - pingStart);
+        }).catch(() => {
         });
       }
     }, PING_INTERVAL);
@@ -21643,7 +22324,7 @@ var ExtensionBridge = class {
         reject(new Error("Extension not connected. Please open the Socials extension in your browser."));
         return;
       }
-      const id = (0, import_crypto.randomUUID)();
+      const id = (0, import_crypto2.randomUUID)();
       const message = { id, type, payload };
       const timeout = setTimeout(() => {
         this.pendingRequests.delete(id);
@@ -21876,65 +22557,6 @@ var ExtensionBridge = class {
   }
 };
 
-// src/analytics.ts
-var import_crypto2 = require("crypto");
-var import_os = require("os");
-var POSTHOG_HOST = process.env.POSTHOG_HOST || "https://us.i.posthog.com";
-var POSTHOG_API_KEY = process.env.POSTHOG_API_KEY || "phc_NxYGkalAkiTBbZOuQChvvHnfRBL7MJABKCuTVXdbyz4";
-function getAnonymousId() {
-  const raw = `${(0, import_os.hostname)()}-${process.env.USER || process.env.USERNAME || "unknown"}`;
-  return (0, import_crypto2.createHash)("sha256").update(raw).digest("hex").slice(0, 16);
-}
-var distinctId = getAnonymousId();
-var pluginVersion = "1.0.10";
-async function capture(event, properties = {}) {
-  try {
-    const payload = {
-      api_key: POSTHOG_API_KEY,
-      event,
-      distinct_id: distinctId,
-      timestamp: (/* @__PURE__ */ new Date()).toISOString(),
-      properties: {
-        plugin_version: pluginVersion,
-        platform: process.platform,
-        node_version: process.version,
-        ...properties
-      }
-    };
-    fetch(`${POSTHOG_HOST}/capture/`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    }).catch(() => {
-    });
-  } catch {
-  }
-}
-function trackServerStart() {
-  capture("mcp_server_started", {
-    source: "claude_code_plugin"
-  });
-}
-function trackExtensionConnected(tier) {
-  capture("mcp_extension_connected", {
-    tier: tier || "unknown"
-  });
-}
-function trackToolUsage(toolName, platform, success = true) {
-  capture("mcp_tool_called", {
-    tool: toolName,
-    platform: platform || "unknown",
-    success
-  });
-}
-function trackError(toolName, errorMessage) {
-  capture("mcp_tool_error", {
-    tool: toolName,
-    error: errorMessage.slice(0, 200)
-    // Truncate long errors
-  });
-}
-
 // src/index.ts
 var bridge = new ExtensionBridge();
 var GetFeedPostsSchema = external_exports.object({
@@ -21995,7 +22617,7 @@ var ReloadTabSchema = external_exports.object({
 });
 var server = new Server(
   {
-    name: "socials-claude-code-plugin",
+    name: "claude-plugins",
     version: "1.0.0"
   },
   {
@@ -22018,455 +22640,499 @@ Upgrade at https://socials.brainrotcreations.com/pricing`
     );
   }
 }
+var allTools = [
+  {
+    name: "socials_check_access",
+    description: "Check connection status. After confirming access, use socials_open_tab to open X/LinkedIn/Reddit.",
+    inputSchema: {
+      type: "object",
+      properties: {},
+      required: []
+    }
+  },
+  {
+    name: "socials_get_feed",
+    description: "Get recent posts from a social media feed. Requires Pro access. Reads the pinned agent tab (set by socials_open_tab), not the tab or window you are looking at\u2014works across Chrome windows.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        platform: {
+          type: "string",
+          enum: ["x", "linkedin", "reddit"],
+          description: "Social media platform to get posts from"
+        },
+        count: {
+          type: "number",
+          description: "Number of posts to fetch (default: 10, max: 50)"
+        }
+      },
+      required: ["platform"]
+    }
+  },
+  {
+    name: "socials_get_post_context",
+    description: "Get detailed context for a specific post including replies. Requires Pro access.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        platform: {
+          type: "string",
+          enum: ["x", "linkedin", "reddit"],
+          description: "Social media platform"
+        },
+        post_url: {
+          type: "string",
+          description: "Full URL of the post"
+        }
+      },
+      required: ["platform", "post_url"]
+    }
+  },
+  {
+    name: "socials_generate_reply",
+    description: "OPTIONAL: Generate a reply using Socials AI with the user's persona. You can also write replies yourself without this tool.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        platform: {
+          type: "string",
+          enum: ["x", "linkedin", "reddit"],
+          description: "Social media platform"
+        },
+        post_content: {
+          type: "string",
+          description: "The content of the post to reply to"
+        },
+        post_author: {
+          type: "string",
+          description: "The author/handle of the post"
+        },
+        persona_id: {
+          type: "string",
+          description: "Optional: specific persona ID to use"
+        },
+        mood: {
+          type: "string",
+          description: "Optional: mood/tone (witty, professional, casual, etc.)"
+        }
+      },
+      required: ["platform", "post_content", "post_author"]
+    }
+  },
+  {
+    name: "socials_quick_reply",
+    description: "Reply from the pinned agent tab's feed (see socials_open_tab)\u2014that tab need not be focused. Clicks reply on the tweet, types the content, and posts. You can write the reply yourself OR use socials_generate_reply first if you want to use the user's persona. IMPORTANT: Always confirm with the user before posting.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        post_id: {
+          type: "string",
+          description: "Tweet/post ID to reply to"
+        },
+        content: {
+          type: "string",
+          description: "The reply content (you can write this yourself)"
+        }
+      },
+      required: ["post_id", "content"]
+    }
+  },
+  {
+    name: "socials_create_post",
+    description: "Publish a new original post on X (not a reply) in the pinned agent tab (need not be focused). Opens the compose dialog from the sidebar, fills the text, and clicks Post. Agent tab should be on X (e.g. https://x.com/home) with the left nav visible. IMPORTANT: Always confirm the exact text with the user before calling this tool.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        platform: {
+          type: "string",
+          enum: ["x"],
+          description: "Must be x"
+        },
+        content: {
+          type: "string",
+          description: "Full post body to publish"
+        }
+      },
+      required: ["platform", "content"]
+    }
+  },
+  {
+    name: "socials_engage_post",
+    description: "On X, perform engagement on a tweet visible in the pinned agent tab (home timeline, list, etc.; tab need not be focused). Uses the tweet id from socials_get_feed. Runs actions in order: like, repost (simple repost, not quote), bookmark, and/or share (opens share menu). Like/bookmark/repost are toggles on X\u2014calling again may undo. IMPORTANT: Only use when the user explicitly wants these actions.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        platform: {
+          type: "string",
+          enum: ["x"],
+          description: "Must be x"
+        },
+        post_id: {
+          type: "string",
+          description: "Tweet status id"
+        },
+        actions: {
+          type: "array",
+          items: {
+            type: "string",
+            enum: ["like", "repost", "bookmark", "share"]
+          },
+          description: "Actions to perform, in order"
+        }
+      },
+      required: ["platform", "post_id", "actions"]
+    }
+  },
+  {
+    name: "socials_x_search",
+    description: "On X, run search in the pinned agent tab (not necessarily the focused tab): fills top search and navigates to results (e.g. /search?q=\u2026). After success, use socials_get_feed, socials_quick_reply, and socials_engage_post on the visible tweets. If the search box is missing, the extension may navigate the agent tab to https://x.com/explore and retry once.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        query: {
+          type: "string",
+          description: "Search string to submit in X's top search box"
+        }
+      },
+      required: ["query"]
+    }
+  },
+  {
+    name: "socials_list_personas",
+    description: "List available personas for content generation. Includes both system personas and user-created custom personas.",
+    inputSchema: {
+      type: "object",
+      properties: {},
+      required: []
+    }
+  },
+  // Browser control tools
+  {
+    name: "socials_open_tab",
+    description: "Open a URL in a new tab and pin it as the Socials agent tab. Automation targets this tab by ID across tabs and Chrome windows (not only the focused window). By default opens in the background (focus: true to switch to it). If a pin already exists, the new tab opens in the same window as that pin so a separate empty window does not steal the agent workspace.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        url: {
+          type: "string",
+          description: "URL to open. Use https://x.com/home for X feed, https://www.linkedin.com/feed/ for LinkedIn feed, and https://www.reddit.com/ (or a subreddit URL) for Reddit."
+        },
+        focus: {
+          type: "boolean",
+          description: "If true, activate the new tab and focus the window. Default false (background)."
+        }
+      },
+      required: ["url"]
+    }
+  },
+  {
+    name: "socials_navigate",
+    description: "Navigate the pinned agent tab (or tab_id if provided) to a URL. Does not require that tab to be active.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        url: {
+          type: "string",
+          description: "URL to navigate to"
+        },
+        tab_id: {
+          type: "number",
+          description: "Optional. If omitted, uses the pinned agent tab from socials_open_tab."
+        }
+      },
+      required: ["url"]
+    }
+  },
+  {
+    name: "socials_get_active_tab",
+    description: "Get the currently focused browser tab (what you are looking at). For the tab Claude automates, use socials_get_agent_tab.",
+    inputSchema: {
+      type: "object",
+      properties: {},
+      required: []
+    }
+  },
+  {
+    name: "socials_get_agent_tab",
+    description: "Get the pinned Socials agent tab (URL, title, platform). Null if none set yet\u2014then call socials_open_tab.",
+    inputSchema: {
+      type: "object",
+      properties: {},
+      required: []
+    }
+  },
+  {
+    name: "socials_focus_agent_tab",
+    description: "Bring the pinned agent tab to the foreground (same as clicking it). Use when you want to watch what Claude is doing.",
+    inputSchema: {
+      type: "object",
+      properties: {},
+      required: []
+    }
+  },
+  {
+    name: "socials_set_agent_tab",
+    description: "Pin an existing tab as the agent tab (e.g. you already have X open). Pass tab_id from socials_get_active_tab.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        tab_id: {
+          type: "number",
+          description: "Chrome tab ID to pin for automation"
+        }
+      },
+      required: ["tab_id"]
+    }
+  },
+  {
+    name: "socials_reload_tab",
+    description: "Reload the pinned agent tab, or tab_id if provided.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        tab_id: {
+          type: "number",
+          description: "Optional. If omitted, reloads the pinned agent tab."
+        }
+      },
+      required: []
+    }
+  },
+  {
+    name: "socials_get_page_content",
+    description: "Get posts from the pinned agent tab (or foreground tab if no pin). Use socials_open_tab first.",
+    inputSchema: {
+      type: "object",
+      properties: {},
+      required: []
+    }
+  },
+  {
+    name: "socials_scroll",
+    description: "Scroll the pinned agent tab to load more posts (does not require that tab to be focused).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        direction: {
+          type: "string",
+          enum: ["down", "up"],
+          description: "Scroll direction (default: down)"
+        },
+        amount: {
+          type: "number",
+          description: "Scroll amount in pixels (default: 800)"
+        }
+      },
+      required: []
+    }
+  },
+  // LinkedIn People Search tools
+  {
+    name: "socials_linkedin_people_search",
+    description: "Search for people on LinkedIn. Navigates to the search results page in the pinned agent tab. Returns list of people with their profiles. Use socials_linkedin_get_people to get the results after search.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        query: {
+          type: "string",
+          description: "Search query (e.g., 'software engineer amazon', 'product manager google')"
+        }
+      },
+      required: ["query"]
+    }
+  },
+  {
+    name: "socials_linkedin_get_people",
+    description: "Get people results from the current LinkedIn people search page. Returns array of people with name, headline, location, profile URL, and connection status. Also returns pagination info (current page, total pages, has next/prev).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        count: {
+          type: "number",
+          description: "Maximum number of people to return (default: 10)"
+        }
+      },
+      required: []
+    }
+  },
+  {
+    name: "socials_linkedin_next_page",
+    description: "Go to the next page of LinkedIn search results. Returns false if already on the last page.",
+    inputSchema: {
+      type: "object",
+      properties: {},
+      required: []
+    }
+  },
+  {
+    name: "socials_linkedin_go_to_page",
+    description: "Go to a specific page number of LinkedIn search results.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        page: {
+          type: "number",
+          description: "Page number to navigate to (1-based)"
+        }
+      },
+      required: ["page"]
+    }
+  },
+  // LinkedIn Posts Search
+  {
+    name: "socials_linkedin_posts_search",
+    description: "Search for posts on LinkedIn. Navigates to search results filtered to Posts. After success, use socials_get_feed to read visible posts, then socials_linkedin_engage or socials_quick_reply to interact.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        query: {
+          type: "string",
+          description: "Search string for LinkedIn posts (e.g. 'founder energy', 'startup tips')"
+        }
+      },
+      required: ["query"]
+    }
+  },
+  // LinkedIn Profile & Connection Tools (handle navigation internally)
+  {
+    name: "socials_linkedin_connect",
+    description: "Send a connection request on LinkedIn. Automatically navigates to the profile if needed. Returns rich status: already_connected, pending_sent, pending_received, follow_only, or success. IMPORTANT: Always confirm with the user before sending connection requests.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        profile_url: {
+          type: "string",
+          description: "LinkedIn profile URL (full URL or /in/username)"
+        },
+        note: {
+          type: "string",
+          description: "Optional personalized note (max 300 chars)"
+        }
+      },
+      required: ["profile_url"]
+    }
+  },
+  {
+    name: "socials_linkedin_profile",
+    description: "Get LinkedIn profile information. Navigates to the profile and extracts data in one call. Returns name, headline, about, experience, education, skills, connection status, and more.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        profile_url: {
+          type: "string",
+          description: "LinkedIn profile URL (full URL or /in/username)"
+        }
+      },
+      required: ["profile_url"]
+    }
+  },
+  {
+    name: "socials_linkedin_connection_status",
+    description: "Check the connection status with a LinkedIn user without sending a request. Returns: connected, pending_sent, pending_received, not_connected, or follow_only.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        profile_url: {
+          type: "string",
+          description: "LinkedIn profile URL (full URL or /in/username)"
+        }
+      },
+      required: ["profile_url"]
+    }
+  },
+  {
+    name: "socials_linkedin_engage",
+    description: "Engage with a LinkedIn post visible on the current feed or search results page. Use socials_get_feed first to get post IDs, then pass the post_id here. Actions: like (toggle), repost (instant), quote_repost (opens dialog). IMPORTANT: Only use when the user explicitly wants these actions.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        post_id: {
+          type: "string",
+          description: "LinkedIn post ID/URN from socials_get_feed"
+        },
+        actions: {
+          type: "array",
+          items: {
+            type: "string",
+            enum: ["like", "repost", "quote_repost"]
+          },
+          description: "Actions to perform"
+        }
+      },
+      required: ["post_id", "actions"]
+    }
+  },
+  // TODO: Re-enable when LinkedIn UI selectors are updated
+  // {
+  //   name: "socials_linkedin_create_post",
+  //   description:
+  //     "Create a new post on LinkedIn. Opens the compose dialog, types the content, and posts. " +
+  //     "IMPORTANT: Always confirm the exact text with the user before calling this tool.",
+  //   inputSchema: {
+  //     type: "object",
+  //     properties: {
+  //       content: {
+  //         type: "string",
+  //         description: "Post content (LinkedIn character limits apply)",
+  //       },
+  //     },
+  //     required: ["content"],
+  //   },
+  // },
+  // Diagnostics tool
+  {
+    name: "socials_diagnostics",
+    description: "Get diagnostics info: health metrics, engagement score, feature flags. Useful for debugging and understanding plugin state.",
+    inputSchema: {
+      type: "object",
+      properties: {},
+      required: []
+    }
+  }
+];
 server.setRequestHandler(ListToolsRequestSchema, async () => {
+  const enabledTools = allTools.filter((tool) => isToolEnabled(tool.name));
   return {
-    tools: [
-      {
-        name: "socials_check_access",
-        description: "Check connection status. After confirming access, use socials_open_tab to open X/LinkedIn/Reddit.",
-        inputSchema: {
-          type: "object",
-          properties: {},
-          required: []
-        }
-      },
-      {
-        name: "socials_get_feed",
-        description: "Get recent posts from a social media feed. Requires Pro access. Reads the pinned agent tab (set by socials_open_tab), not the tab or window you are looking at\u2014works across Chrome windows.",
-        inputSchema: {
-          type: "object",
-          properties: {
-            platform: {
-              type: "string",
-              enum: ["x", "linkedin", "reddit"],
-              description: "Social media platform to get posts from"
-            },
-            count: {
-              type: "number",
-              description: "Number of posts to fetch (default: 10, max: 50)"
-            }
-          },
-          required: ["platform"]
-        }
-      },
-      {
-        name: "socials_get_post_context",
-        description: "Get detailed context for a specific post including replies. Requires Pro access.",
-        inputSchema: {
-          type: "object",
-          properties: {
-            platform: {
-              type: "string",
-              enum: ["x", "linkedin", "reddit"],
-              description: "Social media platform"
-            },
-            post_url: {
-              type: "string",
-              description: "Full URL of the post"
-            }
-          },
-          required: ["platform", "post_url"]
-        }
-      },
-      {
-        name: "socials_generate_reply",
-        description: "OPTIONAL: Generate a reply using Socials AI with the user's persona. You can also write replies yourself without this tool.",
-        inputSchema: {
-          type: "object",
-          properties: {
-            platform: {
-              type: "string",
-              enum: ["x", "linkedin", "reddit"],
-              description: "Social media platform"
-            },
-            post_content: {
-              type: "string",
-              description: "The content of the post to reply to"
-            },
-            post_author: {
-              type: "string",
-              description: "The author/handle of the post"
-            },
-            persona_id: {
-              type: "string",
-              description: "Optional: specific persona ID to use"
-            },
-            mood: {
-              type: "string",
-              description: "Optional: mood/tone (witty, professional, casual, etc.)"
-            }
-          },
-          required: ["platform", "post_content", "post_author"]
-        }
-      },
-      {
-        name: "socials_quick_reply",
-        description: "Reply from the pinned agent tab's feed (see socials_open_tab)\u2014that tab need not be focused. Clicks reply on the tweet, types the content, and posts. You can write the reply yourself OR use socials_generate_reply first if you want to use the user's persona. IMPORTANT: Always confirm with the user before posting.",
-        inputSchema: {
-          type: "object",
-          properties: {
-            post_id: {
-              type: "string",
-              description: "Tweet/post ID to reply to"
-            },
-            content: {
-              type: "string",
-              description: "The reply content (you can write this yourself)"
-            }
-          },
-          required: ["post_id", "content"]
-        }
-      },
-      {
-        name: "socials_create_post",
-        description: "Publish a new original post on X (not a reply) in the pinned agent tab (need not be focused). Opens the compose dialog from the sidebar, fills the text, and clicks Post. Agent tab should be on X (e.g. https://x.com/home) with the left nav visible. IMPORTANT: Always confirm the exact text with the user before calling this tool.",
-        inputSchema: {
-          type: "object",
-          properties: {
-            platform: {
-              type: "string",
-              enum: ["x"],
-              description: "Must be x"
-            },
-            content: {
-              type: "string",
-              description: "Full post body to publish"
-            }
-          },
-          required: ["platform", "content"]
-        }
-      },
-      {
-        name: "socials_engage_post",
-        description: "On X, perform engagement on a tweet visible in the pinned agent tab (home timeline, list, etc.; tab need not be focused). Uses the tweet id from socials_get_feed. Runs actions in order: like, repost (simple repost, not quote), bookmark, and/or share (opens share menu). Like/bookmark/repost are toggles on X\u2014calling again may undo. IMPORTANT: Only use when the user explicitly wants these actions.",
-        inputSchema: {
-          type: "object",
-          properties: {
-            platform: {
-              type: "string",
-              enum: ["x"],
-              description: "Must be x"
-            },
-            post_id: {
-              type: "string",
-              description: "Tweet status id"
-            },
-            actions: {
-              type: "array",
-              items: {
-                type: "string",
-                enum: ["like", "repost", "bookmark", "share"]
-              },
-              description: "Actions to perform, in order"
-            }
-          },
-          required: ["platform", "post_id", "actions"]
-        }
-      },
-      {
-        name: "socials_x_search",
-        description: "On X, run search in the pinned agent tab (not necessarily the focused tab): fills top search and navigates to results (e.g. /search?q=\u2026). After success, use socials_get_feed, socials_quick_reply, and socials_engage_post on the visible tweets. If the search box is missing, the extension may navigate the agent tab to https://x.com/explore and retry once.",
-        inputSchema: {
-          type: "object",
-          properties: {
-            query: {
-              type: "string",
-              description: "Search string to submit in X's top search box"
-            }
-          },
-          required: ["query"]
-        }
-      },
-      {
-        name: "socials_list_personas",
-        description: "List available personas for content generation. Includes both system personas and user-created custom personas.",
-        inputSchema: {
-          type: "object",
-          properties: {},
-          required: []
-        }
-      },
-      // Browser control tools
-      {
-        name: "socials_open_tab",
-        description: "Open a URL in a new tab and pin it as the Socials agent tab. Automation targets this tab by ID across tabs and Chrome windows (not only the focused window). By default opens in the background (focus: true to switch to it). If a pin already exists, the new tab opens in the same window as that pin so a separate empty window does not steal the agent workspace.",
-        inputSchema: {
-          type: "object",
-          properties: {
-            url: {
-              type: "string",
-              description: "URL to open. Use https://x.com/home for X feed, https://www.linkedin.com/feed/ for LinkedIn feed, and https://www.reddit.com/ (or a subreddit URL) for Reddit."
-            },
-            focus: {
-              type: "boolean",
-              description: "If true, activate the new tab and focus the window. Default false (background)."
-            }
-          },
-          required: ["url"]
-        }
-      },
-      {
-        name: "socials_navigate",
-        description: "Navigate the pinned agent tab (or tab_id if provided) to a URL. Does not require that tab to be active.",
-        inputSchema: {
-          type: "object",
-          properties: {
-            url: {
-              type: "string",
-              description: "URL to navigate to"
-            },
-            tab_id: {
-              type: "number",
-              description: "Optional. If omitted, uses the pinned agent tab from socials_open_tab."
-            }
-          },
-          required: ["url"]
-        }
-      },
-      {
-        name: "socials_get_active_tab",
-        description: "Get the currently focused browser tab (what you are looking at). For the tab Claude automates, use socials_get_agent_tab.",
-        inputSchema: {
-          type: "object",
-          properties: {},
-          required: []
-        }
-      },
-      {
-        name: "socials_get_agent_tab",
-        description: "Get the pinned Socials agent tab (URL, title, platform). Null if none set yet\u2014then call socials_open_tab.",
-        inputSchema: {
-          type: "object",
-          properties: {},
-          required: []
-        }
-      },
-      {
-        name: "socials_focus_agent_tab",
-        description: "Bring the pinned agent tab to the foreground (same as clicking it). Use when you want to watch what Claude is doing.",
-        inputSchema: {
-          type: "object",
-          properties: {},
-          required: []
-        }
-      },
-      {
-        name: "socials_set_agent_tab",
-        description: "Pin an existing tab as the agent tab (e.g. you already have X open). Pass tab_id from socials_get_active_tab.",
-        inputSchema: {
-          type: "object",
-          properties: {
-            tab_id: {
-              type: "number",
-              description: "Chrome tab ID to pin for automation"
-            }
-          },
-          required: ["tab_id"]
-        }
-      },
-      {
-        name: "socials_reload_tab",
-        description: "Reload the pinned agent tab, or tab_id if provided.",
-        inputSchema: {
-          type: "object",
-          properties: {
-            tab_id: {
-              type: "number",
-              description: "Optional. If omitted, reloads the pinned agent tab."
-            }
-          },
-          required: []
-        }
-      },
-      {
-        name: "socials_get_page_content",
-        description: "Get posts from the pinned agent tab (or foreground tab if no pin). Use socials_open_tab first.",
-        inputSchema: {
-          type: "object",
-          properties: {},
-          required: []
-        }
-      },
-      {
-        name: "socials_scroll",
-        description: "Scroll the pinned agent tab to load more posts (does not require that tab to be focused).",
-        inputSchema: {
-          type: "object",
-          properties: {
-            direction: {
-              type: "string",
-              enum: ["down", "up"],
-              description: "Scroll direction (default: down)"
-            },
-            amount: {
-              type: "number",
-              description: "Scroll amount in pixels (default: 800)"
-            }
-          },
-          required: []
-        }
-      },
-      // LinkedIn People Search tools
-      {
-        name: "socials_linkedin_people_search",
-        description: "Search for people on LinkedIn. Navigates to the search results page in the pinned agent tab. Returns list of people with their profiles. Use socials_linkedin_get_people to get the results after search.",
-        inputSchema: {
-          type: "object",
-          properties: {
-            query: {
-              type: "string",
-              description: "Search query (e.g., 'software engineer amazon', 'product manager google')"
-            }
-          },
-          required: ["query"]
-        }
-      },
-      {
-        name: "socials_linkedin_get_people",
-        description: "Get people results from the current LinkedIn people search page. Returns array of people with name, headline, location, profile URL, and connection status. Also returns pagination info (current page, total pages, has next/prev).",
-        inputSchema: {
-          type: "object",
-          properties: {
-            count: {
-              type: "number",
-              description: "Maximum number of people to return (default: 10)"
-            }
-          },
-          required: []
-        }
-      },
-      {
-        name: "socials_linkedin_next_page",
-        description: "Go to the next page of LinkedIn search results. Returns false if already on the last page.",
-        inputSchema: {
-          type: "object",
-          properties: {},
-          required: []
-        }
-      },
-      {
-        name: "socials_linkedin_go_to_page",
-        description: "Go to a specific page number of LinkedIn search results.",
-        inputSchema: {
-          type: "object",
-          properties: {
-            page: {
-              type: "number",
-              description: "Page number to navigate to (1-based)"
-            }
-          },
-          required: ["page"]
-        }
-      },
-      // LinkedIn Posts Search
-      {
-        name: "socials_linkedin_posts_search",
-        description: "Search for posts on LinkedIn. Navigates to search results filtered to Posts. After success, use socials_get_feed to read visible posts, then socials_linkedin_engage or socials_quick_reply to interact.",
-        inputSchema: {
-          type: "object",
-          properties: {
-            query: {
-              type: "string",
-              description: "Search string for LinkedIn posts (e.g. 'founder energy', 'startup tips')"
-            }
-          },
-          required: ["query"]
-        }
-      },
-      // LinkedIn Profile & Connection Tools (handle navigation internally)
-      {
-        name: "socials_linkedin_connect",
-        description: "Send a connection request on LinkedIn. Automatically navigates to the profile if needed. Returns rich status: already_connected, pending_sent, pending_received, follow_only, or success. IMPORTANT: Always confirm with the user before sending connection requests.",
-        inputSchema: {
-          type: "object",
-          properties: {
-            profile_url: {
-              type: "string",
-              description: "LinkedIn profile URL (full URL or /in/username)"
-            },
-            note: {
-              type: "string",
-              description: "Optional personalized note (max 300 chars)"
-            }
-          },
-          required: ["profile_url"]
-        }
-      },
-      {
-        name: "socials_linkedin_profile",
-        description: "Get LinkedIn profile information. Navigates to the profile and extracts data in one call. Returns name, headline, about, experience, education, skills, connection status, and more.",
-        inputSchema: {
-          type: "object",
-          properties: {
-            profile_url: {
-              type: "string",
-              description: "LinkedIn profile URL (full URL or /in/username)"
-            }
-          },
-          required: ["profile_url"]
-        }
-      },
-      {
-        name: "socials_linkedin_connection_status",
-        description: "Check the connection status with a LinkedIn user without sending a request. Returns: connected, pending_sent, pending_received, not_connected, or follow_only.",
-        inputSchema: {
-          type: "object",
-          properties: {
-            profile_url: {
-              type: "string",
-              description: "LinkedIn profile URL (full URL or /in/username)"
-            }
-          },
-          required: ["profile_url"]
-        }
-      },
-      {
-        name: "socials_linkedin_engage",
-        description: "Engage with a LinkedIn post visible on the current feed or search results page. Use socials_get_feed first to get post IDs, then pass the post_id here. Actions: like (toggle), repost (instant), quote_repost (opens dialog). IMPORTANT: Only use when the user explicitly wants these actions.",
-        inputSchema: {
-          type: "object",
-          properties: {
-            post_id: {
-              type: "string",
-              description: "LinkedIn post ID/URN from socials_get_feed"
-            },
-            actions: {
-              type: "array",
-              items: {
-                type: "string",
-                enum: ["like", "repost", "quote_repost"]
-              },
-              description: "Actions to perform"
-            }
-          },
-          required: ["post_id", "actions"]
-        }
-      }
-      // TODO: Re-enable when LinkedIn UI selectors are updated
-      // {
-      //   name: "socials_linkedin_create_post",
-      //   description:
-      //     "Create a new post on LinkedIn. Opens the compose dialog, types the content, and posts. " +
-      //     "IMPORTANT: Always confirm the exact text with the user before calling this tool.",
-      //   inputSchema: {
-      //     type: "object",
-      //     properties: {
-      //       content: {
-      //         type: "string",
-      //         description: "Post content (LinkedIn character limits apply)",
-      //       },
-      //     },
-      //     required: ["content"],
-      //   },
-      // },
-    ]
+    tools: enabledTools
   };
 });
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
   const platform = args && typeof args === "object" && "platform" in args ? String(args.platform) : void 0;
+  const getElapsed = createTimer();
+  if (!isToolEnabled(name)) {
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify({
+            error: true,
+            message: `Tool "${name}" is currently disabled. Contact support if you believe this is an error.`,
+            feature_gated: true
+          })
+        }
+      ],
+      isError: true
+    };
+  }
+  if (platform && (platform === "x" || platform === "linkedin" || platform === "reddit")) {
+    if (!isPlatformEnabled(platform)) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({
+              error: true,
+              message: `Platform "${platform}" is currently disabled. Contact support if you believe this is an error.`,
+              feature_gated: true
+            })
+          }
+        ],
+        isError: true
+      };
+    }
+  }
   try {
-    trackToolUsage(name, platform);
     switch (name) {
       case "socials_check_access": {
         const wsServerListening = bridge.isWsServerListening();
@@ -22502,7 +23168,14 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           };
         }
         const { isPro, tier, canUseMcp } = await bridge.checkProAccess();
+        try {
+          const userInfo = await bridge.getCurrentUser();
+          setUserIdentity(userInfo.id, userInfo.email, tier);
+          updateTierGroupProperties();
+        } catch {
+        }
         trackExtensionConnected(tier);
+        trackToolUsage(name, platform, true, getElapsed());
         return {
           content: [
             {
@@ -22527,6 +23200,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           parsed.platform,
           Math.min(parsed.count || 10, 50)
         );
+        const elapsed = getElapsed();
+        trackFeedViewed(parsed.platform, posts.length, elapsed);
+        trackToolUsage(name, parsed.platform, true, elapsed);
         return {
           content: [
             {
@@ -22573,6 +23249,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           parsed.persona_id,
           parsed.mood
         );
+        if (result.metadata?.personaUsed) {
+          trackPersonaUsed(parsed.persona_id || "default", result.metadata.personaUsed);
+        }
         return {
           content: [
             {
@@ -22591,6 +23270,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const postId = args.post_id;
         const content = args.content;
         const result = await bridge.quickReply(postId, content);
+        const elapsed = getElapsed();
+        trackReplySent("x", content, result.success, elapsed);
+        trackToolUsage(name, "x", result.success, elapsed);
         return {
           content: [
             {
@@ -22610,6 +23292,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           platform: parsed.platform,
           content: parsed.content
         });
+        const elapsed = getElapsed();
+        trackPostCreated(parsed.platform, parsed.content, result.success, elapsed);
+        trackToolUsage(name, parsed.platform, result.success, elapsed);
         return {
           content: [
             {
@@ -22630,6 +23315,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           postId: parsed.post_id,
           actions: parsed.actions
         });
+        const elapsed = getElapsed();
+        trackEngagement(parsed.platform, parsed.actions, result.success, elapsed);
+        trackToolUsage(name, parsed.platform, result.success, elapsed);
         return {
           content: [
             {
@@ -22647,6 +23335,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         await requireProAccess();
         const parsed = XSearchSchema.parse(args);
         const result = await bridge.xSearch({ query: parsed.query });
+        const elapsed = getElapsed();
+        trackSearch("x", "posts", result.success, elapsed);
+        trackToolUsage(name, "x", result.success, elapsed);
         return {
           content: [
             {
@@ -22850,6 +23541,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         await requireProAccess();
         const query = args.query;
         const result = await bridge.linkedinPeopleSearch(query);
+        const elapsed = getElapsed();
+        trackSearch("linkedin", "people", result.success, elapsed);
+        trackToolUsage(name, "linkedin", result.success, elapsed);
         return {
           content: [
             {
@@ -22921,6 +23615,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         await requireProAccess();
         const parsed = LinkedInPostsSearchSchema.parse(args);
         const result = await bridge.linkedinPostsSearch(parsed.query);
+        const elapsed = getElapsed();
+        trackSearch("linkedin", "posts", result.success, elapsed);
+        trackToolUsage(name, "linkedin", result.success, elapsed);
         return {
           content: [
             {
@@ -22941,6 +23638,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const profileUrl = args.profile_url;
         const note = args.note;
         const result = await bridge.linkedinConnectV2(profileUrl, note);
+        const elapsed = getElapsed();
+        trackConnectionRequest(result.success, !!note, elapsed);
+        trackToolUsage(name, "linkedin", result.success, elapsed);
         return {
           content: [
             {
@@ -22954,6 +23654,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         await requireProAccess();
         const profileUrl = args.profile_url;
         const result = await bridge.linkedinProfileV2(profileUrl);
+        const elapsed = getElapsed();
+        trackProfileViewed(result.success, elapsed);
+        trackToolUsage(name, "linkedin", result.success, elapsed);
         return {
           content: [
             {
@@ -22985,6 +23688,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           postId,
           actions
         });
+        const elapsed = getElapsed();
+        trackEngagement("linkedin", actions, result.success, elapsed);
+        trackToolUsage(name, "linkedin", result.success, elapsed);
         return {
           content: [
             {
@@ -23013,12 +23719,34 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       //     ],
       //   };
       // }
+      case "socials_diagnostics": {
+        const health = getHealthMetrics();
+        const engagement = getEngagementScore();
+        const extensionConnected = bridge.isConnected();
+        const featureGating = getFeatureGatingStatus();
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify({
+                status: "ok",
+                version: "1.0.16",
+                extension_connected: extensionConnected,
+                health,
+                engagement,
+                feature_gating: featureGating
+              }, null, 2)
+            }
+          ]
+        };
+      }
       default:
         throw new Error(`Unknown tool: ${name}`);
     }
   } catch (error2) {
     const errorMessage = error2 instanceof Error ? error2.message : "Unknown error";
     trackError(name, errorMessage);
+    trackToolUsage(name, platform, false, getElapsed());
     return {
       content: [
         {
@@ -23050,11 +23778,16 @@ async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
   console.error("[socials-plugin] MCP server running");
+  const healthInterval = setInterval(() => {
+    trackHealthMetrics();
+  }, 5 * 60 * 1e3);
   process.on("SIGINT", () => {
+    clearInterval(healthInterval);
     bridge.stop();
     process.exit(0);
   });
   process.on("SIGTERM", () => {
+    clearInterval(healthInterval);
     bridge.stop();
     process.exit(0);
   });

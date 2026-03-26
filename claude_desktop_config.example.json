@@ -2,7 +2,7 @@
   "mcpServers": {
     "socials": {
       "command": "node",
-      "args": ["/absolute/path/to/socials-claude-code-plugin/dist/index.js"],
+      "args": ["/absolute/path/to/claude-plugins/dist/index.js"],
       "env": {
         "SOCIALS_MCP_RECLAIM_PORT": "1"
       }

@@ -8,7 +8,32 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 import { ExtensionBridge } from "./extension-bridge.js";
-import { trackServerStart, trackToolUsage, trackError, trackExtensionConnected } from "./analytics.js";
+import {
+  trackServerStart,
+  trackToolUsage,
+  trackError,
+  trackExtensionConnected,
+  trackExtensionDisconnected,
+  setUserIdentity,
+  clearUserIdentity,
+  trackPostCreated,
+  trackReplySent,
+  trackEngagement,
+  trackSearch,
+  trackProfileViewed,
+  trackConnectionRequest,
+  trackPersonaUsed,
+  trackFeedViewed,
+  createTimer,
+  updateTierGroupProperties,
+  trackHealthMetrics,
+  isFeatureEnabled,
+  getEngagementScore,
+  getHealthMetrics,
+  isToolEnabled,
+  isPlatformEnabled,
+  getFeatureGatingStatus,
+} from "./analytics.js";
 
 const bridge = new ExtensionBridge();
 
@@ -130,7 +155,7 @@ const ReloadTabSchema = z.object({
 // Create MCP server
 const server = new Server(
   {
-    name: "socials-claude-code-plugin",
+    name: "claude-plugins",
     version: "1.0.0",
   },
   {
@@ -159,12 +184,10 @@ async function requireProAccess(): Promise<void> {
   }
 }
 
-// List available tools
-server.setRequestHandler(ListToolsRequestSchema, async () => {
-  return {
-    tools: [
-      {
-        name: "socials_check_access",
+// All tool definitions
+const allTools = [
+  {
+    name: "socials_check_access",
         description:
           "Check connection status. After confirming access, use socials_open_tab to open X/LinkedIn/Reddit.",
         inputSchema: {
@@ -655,7 +678,27 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       //     required: ["content"],
       //   },
       // },
-    ],
+      // Diagnostics tool
+      {
+        name: "socials_diagnostics",
+        description:
+          "Get diagnostics info: health metrics, engagement score, feature flags. " +
+          "Useful for debugging and understanding plugin state.",
+        inputSchema: {
+          type: "object",
+          properties: {},
+          required: [],
+        },
+      },
+];
+
+// List available tools (filtered by feature flags)
+server.setRequestHandler(ListToolsRequestSchema, async () => {
+  // Filter tools based on feature flags
+  const enabledTools = allTools.filter(tool => isToolEnabled(tool.name));
+
+  return {
+    tools: enabledTools,
   };
 });
 
@@ -668,9 +711,46 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     ? String((args as { platform?: string }).platform)
     : undefined;
 
+  // Start timer for this tool call
+  const getElapsed = createTimer();
+
+  // Check if tool is enabled via feature flags
+  if (!isToolEnabled(name)) {
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify({
+            error: true,
+            message: `Tool "${name}" is currently disabled. Contact support if you believe this is an error.`,
+            feature_gated: true,
+          }),
+        },
+      ],
+      isError: true,
+    };
+  }
+
+  // Check platform-level flag for platform-specific tools
+  if (platform && (platform === "x" || platform === "linkedin" || platform === "reddit")) {
+    if (!isPlatformEnabled(platform)) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({
+              error: true,
+              message: `Platform "${platform}" is currently disabled. Contact support if you believe this is an error.`,
+              feature_gated: true,
+            }),
+          },
+        ],
+        isError: true,
+      };
+    }
+  }
+
   try {
-    // Track tool usage (fire-and-forget)
-    trackToolUsage(name, platform);
 
     switch (name) {
       case "socials_check_access": {
@@ -719,8 +799,18 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
         const { isPro, tier, canUseMcp } = await bridge.checkProAccess();
 
-        // Track successful connection
+        // Get full user info for analytics
+        try {
+          const userInfo = await bridge.getCurrentUser();
+          setUserIdentity(userInfo.id, userInfo.email, tier);
+          updateTierGroupProperties();
+        } catch {
+          // Continue without user identity if getCurrentUser fails
+        }
+
+        // Track successful connection and tool usage with timing
         trackExtensionConnected(tier);
+        trackToolUsage(name, platform, true, getElapsed());
 
         return {
           content: [
@@ -751,6 +841,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           parsed.platform,
           Math.min(parsed.count || 10, 50),
         );
+
+        // Track feed view with timing
+        const elapsed = getElapsed();
+        trackFeedViewed(parsed.platform, posts.length, elapsed);
+        trackToolUsage(name, parsed.platform, true, elapsed);
 
         return {
           content: [
@@ -802,6 +897,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           parsed.mood,
         );
 
+        // Track persona usage if specified
+        if (result.metadata?.personaUsed) {
+          trackPersonaUsed(parsed.persona_id || "default", result.metadata.personaUsed);
+        }
+
         return {
           content: [
             {
@@ -823,6 +923,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
         const result = await bridge.quickReply(postId, content);
 
+        // Track reply sent with content analysis and timing
+        const elapsed = getElapsed();
+        trackReplySent("x", content, result.success, elapsed);
+        trackToolUsage(name, "x", result.success, elapsed);
+
         return {
           content: [
             {
@@ -843,6 +948,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           platform: parsed.platform,
           content: parsed.content,
         });
+
+        // Track post created with content analysis and timing
+        const elapsed = getElapsed();
+        trackPostCreated(parsed.platform, parsed.content, result.success, elapsed);
+        trackToolUsage(name, parsed.platform, result.success, elapsed);
 
         return {
           content: [
@@ -866,6 +976,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           actions: parsed.actions,
         });
 
+        // Track engagement with timing
+        const elapsed = getElapsed();
+        trackEngagement(parsed.platform, parsed.actions, result.success, elapsed);
+        trackToolUsage(name, parsed.platform, result.success, elapsed);
+
         return {
           content: [
             {
@@ -884,6 +999,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         await requireProAccess();
         const parsed = XSearchSchema.parse(args);
         const result = await bridge.xSearch({ query: parsed.query });
+
+        // Track search with timing
+        const elapsed = getElapsed();
+        trackSearch("x", "posts", result.success, elapsed);
+        trackToolUsage(name, "x", result.success, elapsed);
 
         return {
           content: [
@@ -1125,6 +1245,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const query = (args as { query: string }).query;
         const result = await bridge.linkedinPeopleSearch(query);
 
+        // Track search with timing
+        const elapsed = getElapsed();
+        trackSearch("linkedin", "people", result.success, elapsed);
+        trackToolUsage(name, "linkedin", result.success, elapsed);
+
         return {
           content: [
             {
@@ -1210,6 +1335,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const parsed = LinkedInPostsSearchSchema.parse(args);
         const result = await bridge.linkedinPostsSearch(parsed.query);
 
+        // Track search with timing
+        const elapsed = getElapsed();
+        trackSearch("linkedin", "posts", result.success, elapsed);
+        trackToolUsage(name, "linkedin", result.success, elapsed);
+
         return {
           content: [
             {
@@ -1235,6 +1365,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const note = (args as { note?: string }).note;
         const result = await bridge.linkedinConnectV2(profileUrl, note);
 
+        // Track connection request with timing
+        const elapsed = getElapsed();
+        trackConnectionRequest(result.success, !!note, elapsed);
+        trackToolUsage(name, "linkedin", result.success, elapsed);
+
         return {
           content: [
             {
@@ -1249,6 +1384,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         await requireProAccess();
         const profileUrl = (args as { profile_url: string }).profile_url;
         const result = await bridge.linkedinProfileV2(profileUrl);
+
+        // Track profile viewed with timing
+        const elapsed = getElapsed();
+        trackProfileViewed(result.success, elapsed);
+        trackToolUsage(name, "linkedin", result.success, elapsed);
 
         return {
           content: [
@@ -1287,6 +1427,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           actions,
         });
 
+        // Track engagement with timing
+        const elapsed = getElapsed();
+        trackEngagement("linkedin", actions, result.success, elapsed);
+        trackToolUsage(name, "linkedin", result.success, elapsed);
+
         return {
           content: [
             {
@@ -1317,6 +1462,31 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       //   };
       // }
 
+      case "socials_diagnostics": {
+        const health = getHealthMetrics();
+        const engagement = getEngagementScore();
+        const extensionConnected = bridge.isConnected();
+
+        // Get feature gating status
+        const featureGating = getFeatureGatingStatus();
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify({
+                status: "ok",
+                version: "1.0.16",
+                extension_connected: extensionConnected,
+                health,
+                engagement,
+                feature_gating: featureGating,
+              }, null, 2),
+            },
+          ],
+        };
+      }
+
       default:
         throw new Error(`Unknown tool: ${name}`);
     }
@@ -1324,8 +1494,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const errorMessage =
       error instanceof Error ? error.message : "Unknown error";
 
-    // Track error
+    // Track error with timing
     trackError(name, errorMessage);
+    trackToolUsage(name, platform, false, getElapsed());
 
     return {
       content: [
@@ -1369,13 +1540,20 @@ async function main(): Promise<void> {
   await server.connect(transport);
   console.error("[socials-plugin] MCP server running");
 
+  // Start periodic health tracking (every 5 minutes)
+  const healthInterval = setInterval(() => {
+    trackHealthMetrics();
+  }, 5 * 60 * 1000);
+
   // Handle shutdown
   process.on("SIGINT", () => {
+    clearInterval(healthInterval);
     bridge.stop();
     process.exit(0);
   });
 
   process.on("SIGTERM", () => {
+    clearInterval(healthInterval);
     bridge.stop();
     process.exit(0);
   });

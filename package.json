@@ -1,11 +1,11 @@
 {
-  "name": "socials-claude-code-plugin",
-  "version": "1.0.10",
+  "name": "claude-plugins",
+  "version": "1.0.16",
   "description": "Official Socials Claude Code plugin: MCP server for the Socials browser extension (Claude Desktop compatible)",
   "type": "module",
   "main": "dist/index.js",
   "bin": {
-    "socials-claude-code-plugin": "./dist/index.js"
+    "claude-plugins": "./dist/index.js"
   },
   "keywords": [
     "mcp",
@@ -18,7 +18,7 @@
     "x",
     "linkedin",
     "reddit",
-    "socials-claude-code-plugin"
+    "claude-plugins"
   ],
   "homepage": "https://socials.brainrotcreations.com",
   "repository": {

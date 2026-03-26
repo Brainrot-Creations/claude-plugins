@@ -1,6 +1,7 @@
 import { execFileSync } from "child_process";
 import { WebSocketServer, WebSocket } from "ws";
 import { randomUUID } from "crypto";
+import { trackExtensionDisconnected, clearUserIdentity, recordExtensionLatency } from "./analytics.js";
 import type {
   ExtensionMessage,
   ExtensionResponse,
@@ -101,6 +102,9 @@ export class ExtensionBridge {
             console.error("[ExtensionBridge] Extension disconnected");
             if (this.client === ws) {
               this.client = null;
+              // Track disconnection and clear user identity
+              trackExtensionDisconnected();
+              clearUserIdentity();
             }
           });
 
@@ -134,9 +138,15 @@ export class ExtensionBridge {
 
     this.pingInterval = setInterval(() => {
       if (this.client?.readyState === WebSocket.OPEN) {
-        this.sendRequest("ping", undefined).catch(() => {
-          // Ping failed, connection may be dead
-        });
+        const pingStart = Date.now();
+        this.sendRequest("ping", undefined)
+          .then(() => {
+            // Record latency on successful ping
+            recordExtensionLatency(Date.now() - pingStart);
+          })
+          .catch(() => {
+            // Ping failed, connection may be dead
+          });
       }
     }, PING_INTERVAL);
   }
