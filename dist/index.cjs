@@ -25297,7 +25297,7 @@ function getAnonymousMachineId() {
   return (0, import_crypto2.createHash)("sha256").update(raw).digest("hex").slice(0, 16);
 }
 var anonymousMachineId = getAnonymousMachineId();
-var pluginVersion = "1.0.25";
+var pluginVersion = "1.0.26";
 var userId = null;
 var userEmail = null;
 var userTier = null;
@@ -27314,7 +27314,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
               type: "text",
               text: JSON.stringify({
                 status: "ok",
-                version: "1.0.25",
+                version: "1.0.26",
                 extension_connected: extensionConnected,
                 health,
                 engagement,
