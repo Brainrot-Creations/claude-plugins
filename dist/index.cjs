@@ -21539,13 +21539,13 @@ var import_crypto2 = require("crypto");
 var import_crypto = require("crypto");
 var import_os = require("os");
 var POSTHOG_HOST = process.env.POSTHOG_HOST || "https://us.i.posthog.com";
-var POSTHOG_API_KEY = process.env.POSTHOG_API_KEY || "phc_NxYGkalAkiTBbZOuQChvvHnfRBL7MJABKCuTVXdbyz4";
+var POSTHOG_API_KEY = process.env.POSTHOG_API_KEY || "phc_HzbU9VFUqbZA66VeBnhpaQtgTkjhw70JekcWxsHVtJM";
 function getAnonymousMachineId() {
   const raw = `${(0, import_os.hostname)()}-${process.env.USER || process.env.USERNAME || "unknown"}`;
   return (0, import_crypto.createHash)("sha256").update(raw).digest("hex").slice(0, 16);
 }
 var anonymousMachineId = getAnonymousMachineId();
-var pluginVersion = "1.0.16";
+var pluginVersion = "1.0.18";
 var userId = null;
 var userEmail = null;
 var userTier = null;

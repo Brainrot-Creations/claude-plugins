@@ -16,9 +16,9 @@
 import { createHash } from "crypto";
 import { hostname } from "os";
 
-// PostHog configuration - same project as the main Socials server
+// PostHog configuration - Brainrot Creations project
 const POSTHOG_HOST = process.env.POSTHOG_HOST || "https://us.i.posthog.com";
-const POSTHOG_API_KEY = process.env.POSTHOG_API_KEY || "phc_NxYGkalAkiTBbZOuQChvvHnfRBL7MJABKCuTVXdbyz4";
+const POSTHOG_API_KEY = process.env.POSTHOG_API_KEY || "phc_HzbU9VFUqbZA66VeBnhpaQtgTkjhw70JekcWxsHVtJM";
 
 // Generate anonymous machine ID (hash of hostname + username) - fallback only
 function getAnonymousMachineId(): string {
@@ -27,7 +27,7 @@ function getAnonymousMachineId(): string {
 }
 
 const anonymousMachineId = getAnonymousMachineId();
-const pluginVersion = "1.0.16";
+const pluginVersion = "1.0.18";
 
 // User identity from extension (set when extension connects)
 let userId: string | null = null;
