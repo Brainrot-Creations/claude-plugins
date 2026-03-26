@@ -19,4 +19,4 @@
 
 ## Reporting issues
 
-If you find a security issue in this repository, please open a private report or email the maintainers through the contact on [socials.brainrotcreations.com](https://socials.brainrotcreations.com) rather than filing a public issue with exploit details.
+If you find a security issue in this repository, please email [contact@brainrotcreations.com](mailto:contact@brainrotcreations.com) rather than filing a public issue with exploit details.
