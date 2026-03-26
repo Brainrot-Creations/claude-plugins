@@ -21538,14 +21538,14 @@ var import_crypto2 = require("crypto");
 // src/analytics.ts
 var import_crypto = require("crypto");
 var import_os = require("os");
-var POSTHOG_HOST = process.env.POSTHOG_HOST || "https://us.i.posthog.com";
-var POSTHOG_API_KEY = process.env.POSTHOG_API_KEY || "phc_HzbU9VFUqbZA66VeBnhpaQtgTkjhw70JekcWxsHVtJM";
+var POSTHOG_HOST = "https://us.i.posthog.com";
+var POSTHOG_API_KEY = "phc_HzbU9VFUqbZA66VeBnhpaQtgTkjhw70JekcWxsHVtJM";
 function getAnonymousMachineId() {
   const raw = `${(0, import_os.hostname)()}-${process.env.USER || process.env.USERNAME || "unknown"}`;
   return (0, import_crypto.createHash)("sha256").update(raw).digest("hex").slice(0, 16);
 }
 var anonymousMachineId = getAnonymousMachineId();
-var pluginVersion = "1.0.18";
+var pluginVersion = "1.0.19";
 var userId = null;
 var userEmail = null;
 var userTier = null;
@@ -21564,6 +21564,7 @@ var totalEventsSent = 0;
 var totalEventsFailed = 0;
 var featureFlagsCache = {};
 var featureFlagsFetchedAt = null;
+var featureFlagsFetchPromise = null;
 var FEATURE_FLAGS_TTL = 5 * 60 * 1e3;
 function setUserIdentity(id, email2, tier) {
   const previousId = userId ? null : `anon_${anonymousMachineId}`;
@@ -21602,7 +21603,7 @@ function clearUserIdentity() {
 function getDistinctId() {
   return userId || `anon_${anonymousMachineId}`;
 }
-async function fetchFeatureFlags() {
+async function fetchFeatureFlagsInternal() {
   try {
     const response = await fetch(`${POSTHOG_HOST}/decide/?v=3`, {
       method: "POST",
@@ -21623,11 +21624,33 @@ async function fetchFeatureFlags() {
       featureFlagsFetchedAt = Date.now();
     }
   } catch {
+    featureFlagsFetchedAt = Date.now();
+  }
+}
+function fetchFeatureFlags() {
+  if (!featureFlagsFetchPromise) {
+    featureFlagsFetchPromise = fetchFeatureFlagsInternal().finally(() => {
+      featureFlagsFetchPromise = null;
+    });
+  }
+  return featureFlagsFetchPromise;
+}
+async function ensureFeatureFlagsLoaded() {
+  if (!featureFlagsFetchedAt) {
+    await fetchFeatureFlags();
   }
 }
 function isFeatureEnabled(flagName, defaultValue = false) {
   if (!featureFlagsFetchedAt || Date.now() - featureFlagsFetchedAt > FEATURE_FLAGS_TTL) {
     fetchFeatureFlags();
+  }
+  const value = featureFlagsCache[flagName];
+  if (value === void 0) return defaultValue;
+  return value === true || value === "true";
+}
+async function isFeatureEnabledAsync(flagName, defaultValue = false) {
+  if (!featureFlagsFetchedAt || Date.now() - featureFlagsFetchedAt > FEATURE_FLAGS_TTL) {
+    await fetchFeatureFlags();
   }
   const value = featureFlagsCache[flagName];
   if (value === void 0) return defaultValue;
@@ -21723,6 +21746,23 @@ function isToolEnabled(toolName) {
   const toolFlag = ToolFlags[toolName];
   if (toolFlag) {
     return isFeatureEnabled(toolFlag, true);
+  }
+  return true;
+}
+async function isPlatformEnabledAsync(platform) {
+  const flagName = PlatformFlags[platform];
+  return isFeatureEnabledAsync(flagName, true);
+}
+async function isToolEnabledAsync(toolName) {
+  const platform = ToolPlatformMap[toolName];
+  if (platform && platform !== "core" && platform !== "browser") {
+    if (!await isPlatformEnabledAsync(platform)) {
+      return false;
+    }
+  }
+  const toolFlag = ToolFlags[toolName];
+  if (toolFlag) {
+    return isFeatureEnabledAsync(toolFlag, true);
   }
   return true;
 }
@@ -23100,7 +23140,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
   const platform = args && typeof args === "object" && "platform" in args ? String(args.platform) : void 0;
   const getElapsed = createTimer();
-  if (!isToolEnabled(name)) {
+  if (!await isToolEnabledAsync(name)) {
     return {
       content: [
         {
@@ -23116,7 +23156,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     };
   }
   if (platform && (platform === "x" || platform === "linkedin" || platform === "reddit")) {
-    if (!isPlatformEnabled(platform)) {
+    if (!await isPlatformEnabledAsync(platform)) {
       return {
         content: [
           {
@@ -23172,6 +23212,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           const userInfo = await bridge.getCurrentUser();
           setUserIdentity(userInfo.id, userInfo.email, tier);
           updateTierGroupProperties();
+          await ensureFeatureFlagsLoaded();
         } catch {
         }
         trackExtensionConnected(tier);

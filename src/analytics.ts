@@ -16,9 +16,9 @@
 import { createHash } from "crypto";
 import { hostname } from "os";
 
-// PostHog configuration - Brainrot Creations project
-const POSTHOG_HOST = process.env.POSTHOG_HOST || "https://us.i.posthog.com";
-const POSTHOG_API_KEY = process.env.POSTHOG_API_KEY || "phc_HzbU9VFUqbZA66VeBnhpaQtgTkjhw70JekcWxsHVtJM";
+// PostHog configuration - Brainrot Creations project (hardcoded)
+const POSTHOG_HOST = "https://us.i.posthog.com";
+const POSTHOG_API_KEY = "phc_HzbU9VFUqbZA66VeBnhpaQtgTkjhw70JekcWxsHVtJM";
 
 // Generate anonymous machine ID (hash of hostname + username) - fallback only
 function getAnonymousMachineId(): string {
@@ -27,7 +27,7 @@ function getAnonymousMachineId(): string {
 }
 
 const anonymousMachineId = getAnonymousMachineId();
-const pluginVersion = "1.0.18";
+const pluginVersion = "1.0.19";
 
 // User identity from extension (set when extension connects)
 let userId: string | null = null;
@@ -56,6 +56,7 @@ let totalEventsFailed = 0;
 // Feature flags cache
 let featureFlagsCache: Record<string, boolean | string> = {};
 let featureFlagsFetchedAt: number | null = null;
+let featureFlagsFetchPromise: Promise<void> | null = null;
 const FEATURE_FLAGS_TTL = 5 * 60 * 1000; // 5 minutes
 
 /**
@@ -127,7 +128,7 @@ interface EventProperties {
 /**
  * Fetch feature flags from PostHog for the current user
  */
-async function fetchFeatureFlags(): Promise<void> {
+async function fetchFeatureFlagsInternal(): Promise<void> {
   try {
     const response = await fetch(`${POSTHOG_HOST}/decide/?v=3`, {
       method: "POST",
@@ -149,19 +150,59 @@ async function fetchFeatureFlags(): Promise<void> {
       featureFlagsFetchedAt = Date.now();
     }
   } catch {
-    // Silently ignore - feature flags are optional
+    // On error, set fetched time to prevent constant retries
+    // but keep cache empty so defaults apply
+    featureFlagsFetchedAt = Date.now();
   }
 }
 
 /**
- * Check if a feature flag is enabled
+ * Fetch feature flags, deduplicating concurrent requests
+ */
+function fetchFeatureFlags(): Promise<void> {
+  if (!featureFlagsFetchPromise) {
+    featureFlagsFetchPromise = fetchFeatureFlagsInternal().finally(() => {
+      featureFlagsFetchPromise = null;
+    });
+  }
+  return featureFlagsFetchPromise;
+}
+
+/**
+ * Ensure feature flags are loaded (call at startup or before first tool use)
+ */
+export async function ensureFeatureFlagsLoaded(): Promise<void> {
+  if (!featureFlagsFetchedAt) {
+    await fetchFeatureFlags();
+  }
+}
+
+/**
+ * Check if a feature flag is enabled (sync version - uses cached value)
  * @param flagName - Name of the feature flag
  * @param defaultValue - Default value if flag is not found
  */
 export function isFeatureEnabled(flagName: string, defaultValue: boolean = false): boolean {
-  // Refresh flags if stale
+  // Trigger background refresh if stale (but don't wait)
   if (!featureFlagsFetchedAt || Date.now() - featureFlagsFetchedAt > FEATURE_FLAGS_TTL) {
     fetchFeatureFlags();
+  }
+
+  const value = featureFlagsCache[flagName];
+  if (value === undefined) return defaultValue;
+  return value === true || value === "true";
+}
+
+/**
+ * Check if a feature flag is enabled (async version - ensures flags are loaded first)
+ * Use this for critical checks where you need accurate flag values
+ * @param flagName - Name of the feature flag
+ * @param defaultValue - Default value if flag is not found
+ */
+export async function isFeatureEnabledAsync(flagName: string, defaultValue: boolean = false): Promise<boolean> {
+  // Ensure flags are loaded before checking
+  if (!featureFlagsFetchedAt || Date.now() - featureFlagsFetchedAt > FEATURE_FLAGS_TTL) {
+    await fetchFeatureFlags();
   }
 
   const value = featureFlagsCache[flagName];
@@ -299,7 +340,7 @@ export function isPlatformEnabled(platform: "x" | "linkedin" | "reddit"): boolea
 }
 
 /**
- * Check if a specific tool is enabled
+ * Check if a specific tool is enabled (sync - uses cached flags)
  * Checks both platform flag and tool-specific flag
  * Default: all tools enabled (true) unless explicitly disabled
  */
@@ -318,6 +359,40 @@ export function isToolEnabled(toolName: string): boolean {
   const toolFlag = ToolFlags[toolName];
   if (toolFlag) {
     return isFeatureEnabled(toolFlag, true); // Default to enabled
+  }
+
+  // Unknown tools are enabled by default
+  return true;
+}
+
+/**
+ * Check if a platform is enabled (async - ensures flags are loaded)
+ * Default: all platforms enabled (true) unless explicitly disabled in PostHog
+ */
+export async function isPlatformEnabledAsync(platform: "x" | "linkedin" | "reddit"): Promise<boolean> {
+  const flagName = PlatformFlags[platform];
+  return isFeatureEnabledAsync(flagName, true); // Default to enabled
+}
+
+/**
+ * Check if a specific tool is enabled (async - ensures flags are loaded)
+ * Use this for accurate flag checking before tool execution
+ */
+export async function isToolEnabledAsync(toolName: string): Promise<boolean> {
+  // Core and browser tools are always enabled (unless explicitly disabled)
+  const platform = ToolPlatformMap[toolName];
+
+  // Check platform-level flag first (for platform-specific tools)
+  if (platform && platform !== "core" && platform !== "browser") {
+    if (!(await isPlatformEnabledAsync(platform as "x" | "linkedin" | "reddit"))) {
+      return false;
+    }
+  }
+
+  // Check tool-specific flag
+  const toolFlag = ToolFlags[toolName];
+  if (toolFlag) {
+    return isFeatureEnabledAsync(toolFlag, true); // Default to enabled
   }
 
   // Unknown tools are enabled by default

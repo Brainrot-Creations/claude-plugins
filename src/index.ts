@@ -32,6 +32,9 @@ import {
   getHealthMetrics,
   isToolEnabled,
   isPlatformEnabled,
+  isToolEnabledAsync,
+  isPlatformEnabledAsync,
+  ensureFeatureFlagsLoaded,
   getFeatureGatingStatus,
 } from "./analytics.js";
 
@@ -714,8 +717,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   // Start timer for this tool call
   const getElapsed = createTimer();
 
-  // Check if tool is enabled via feature flags
-  if (!isToolEnabled(name)) {
+  // Check if tool is enabled via feature flags (async to ensure flags are loaded)
+  if (!(await isToolEnabledAsync(name))) {
     return {
       content: [
         {
@@ -733,7 +736,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
   // Check platform-level flag for platform-specific tools
   if (platform && (platform === "x" || platform === "linkedin" || platform === "reddit")) {
-    if (!isPlatformEnabled(platform)) {
+    if (!(await isPlatformEnabledAsync(platform))) {
       return {
         content: [
           {
@@ -804,6 +807,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           const userInfo = await bridge.getCurrentUser();
           setUserIdentity(userInfo.id, userInfo.email, tier);
           updateTierGroupProperties();
+          // Pre-load feature flags for this user
+          await ensureFeatureFlagsLoaded();
         } catch {
           // Continue without user identity if getCurrentUser fails
         }
