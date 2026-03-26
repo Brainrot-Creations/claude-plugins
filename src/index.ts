@@ -718,7 +718,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const getElapsed = createTimer();
 
   // Check if tool is enabled via feature flags (async to ensure flags are loaded)
-  if (!(await isToolEnabledAsync(name))) {
+  const toolEnabled = await isToolEnabledAsync(name);
+  console.error(`[socials-plugin] Tool gating check: ${name} → enabled: ${toolEnabled}`);
+  if (!toolEnabled) {
     return {
       content: [
         {

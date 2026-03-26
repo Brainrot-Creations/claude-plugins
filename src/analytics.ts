@@ -25,7 +25,7 @@ function getAnonymousMachineId(): string {
 }
 
 const anonymousMachineId = getAnonymousMachineId();
-const pluginVersion = "1.0.20";
+const pluginVersion = "1.0.21";
 
 // User identity from extension (set when extension connects)
 let userId: string | null = null;
@@ -52,6 +52,7 @@ let lastExtensionLatencyMs: number | null = null;
 let featureFlagsCache: Record<string, boolean | string> = {};
 let featureFlagsFetchedAt: number | null = null;
 let featureFlagsFetchPromise: Promise<void> | null = null;
+let featureFlagsFetchSucceeded: boolean = false; // Track if last fetch was successful
 const FEATURE_FLAGS_TTL = 5 * 60 * 1000; // 5 minutes
 
 /**
@@ -141,6 +142,7 @@ export function clearUserIdentity(): void {
   toolCallCount = 0;
   featureFlagsCache = {};
   featureFlagsFetchedAt = null;
+  featureFlagsFetchSucceeded = false;
 }
 
 interface EventProperties {
@@ -163,9 +165,14 @@ async function fetchFeatureFlagsInternal(): Promise<void> {
     });
     featureFlagsCache = flags || {};
     featureFlagsFetchedAt = Date.now();
-  } catch {
+    featureFlagsFetchSucceeded = true;
+    // Log for debugging
+    console.error(`[socials-plugin] Feature flags loaded: ${JSON.stringify(featureFlagsCache)}`);
+  } catch (error) {
     // On error, set fetched time to prevent constant retries
     featureFlagsFetchedAt = Date.now();
+    featureFlagsFetchSucceeded = false;
+    console.error(`[socials-plugin] Failed to fetch feature flags: ${error}`);
   }
 }
 
@@ -192,6 +199,9 @@ export async function ensureFeatureFlagsLoaded(): Promise<void> {
 
 /**
  * Check if a feature flag is enabled (sync version - uses cached value)
+ *
+ * IMPORTANT: If flags were successfully fetched and the flag is missing, return FALSE (disabled).
+ * Only use defaultValue if no fetch has happened yet or fetch failed.
  */
 export function isFeatureEnabled(flagName: string, defaultValue: boolean = false): boolean {
   // Trigger background refresh if stale (but don't wait)
@@ -200,12 +210,26 @@ export function isFeatureEnabled(flagName: string, defaultValue: boolean = false
   }
 
   const value = featureFlagsCache[flagName];
-  if (value === undefined) return defaultValue;
-  return value === true || value === "true";
+
+  // If flag is explicitly in cache, use its value
+  if (value !== undefined) {
+    return value === true || value === "true";
+  }
+
+  // Flag not in cache - if fetch succeeded, treat as disabled; otherwise use default
+  if (featureFlagsFetchSucceeded) {
+    return false; // Flag not found after successful fetch = disabled
+  }
+
+  return defaultValue;
 }
 
 /**
  * Check if a feature flag is enabled (async version - ensures flags are loaded first)
+ *
+ * IMPORTANT: If flags were successfully fetched and the flag is missing, return FALSE (disabled).
+ * This ensures that inactive flags in PostHog properly disable tools.
+ * Only use defaultValue if the fetch itself failed (graceful degradation).
  */
 export async function isFeatureEnabledAsync(flagName: string, defaultValue: boolean = false): Promise<boolean> {
   if (!featureFlagsFetchedAt || Date.now() - featureFlagsFetchedAt > FEATURE_FLAGS_TTL) {
@@ -213,8 +237,22 @@ export async function isFeatureEnabledAsync(flagName: string, defaultValue: bool
   }
 
   const value = featureFlagsCache[flagName];
-  if (value === undefined) return defaultValue;
-  return value === true || value === "true";
+
+  // If flag is explicitly in cache, use its value
+  if (value !== undefined) {
+    const enabled = value === true || value === "true";
+    console.error(`[socials-plugin] Flag ${flagName} = ${value} (enabled: ${enabled})`);
+    return enabled;
+  }
+
+  // Flag not in cache - if fetch succeeded, treat as disabled; if fetch failed, use default
+  if (featureFlagsFetchSucceeded) {
+    console.error(`[socials-plugin] Flag ${flagName} not in cache (fetch succeeded) → disabled`);
+    return false; // Flag not found after successful fetch = disabled
+  }
+
+  console.error(`[socials-plugin] Flag ${flagName} not in cache (fetch failed) → default: ${defaultValue}`);
+  return defaultValue; // Graceful degradation on fetch failure
 }
 
 /**

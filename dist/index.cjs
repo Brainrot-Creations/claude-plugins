@@ -25297,7 +25297,7 @@ function getAnonymousMachineId() {
   return (0, import_crypto2.createHash)("sha256").update(raw).digest("hex").slice(0, 16);
 }
 var anonymousMachineId = getAnonymousMachineId();
-var pluginVersion = "1.0.20";
+var pluginVersion = "1.0.21";
 var userId = null;
 var userEmail = null;
 var userTier = null;
@@ -25314,6 +25314,7 @@ var lastExtensionLatencyMs = null;
 var featureFlagsCache = {};
 var featureFlagsFetchedAt = null;
 var featureFlagsFetchPromise = null;
+var featureFlagsFetchSucceeded = false;
 var FEATURE_FLAGS_TTL = 5 * 60 * 1e3;
 function getDistinctId() {
   return userId || `anon_${anonymousMachineId}`;
@@ -25372,6 +25373,7 @@ function clearUserIdentity() {
   toolCallCount = 0;
   featureFlagsCache = {};
   featureFlagsFetchedAt = null;
+  featureFlagsFetchSucceeded = false;
 }
 async function fetchFeatureFlagsInternal() {
   try {
@@ -25384,8 +25386,12 @@ async function fetchFeatureFlagsInternal() {
     });
     featureFlagsCache = flags || {};
     featureFlagsFetchedAt = Date.now();
-  } catch {
+    featureFlagsFetchSucceeded = true;
+    console.error(`[socials-plugin] Feature flags loaded: ${JSON.stringify(featureFlagsCache)}`);
+  } catch (error2) {
     featureFlagsFetchedAt = Date.now();
+    featureFlagsFetchSucceeded = false;
+    console.error(`[socials-plugin] Failed to fetch feature flags: ${error2}`);
   }
 }
 function fetchFeatureFlags() {
@@ -25406,16 +25412,30 @@ function isFeatureEnabled(flagName, defaultValue = false) {
     fetchFeatureFlags();
   }
   const value = featureFlagsCache[flagName];
-  if (value === void 0) return defaultValue;
-  return value === true || value === "true";
+  if (value !== void 0) {
+    return value === true || value === "true";
+  }
+  if (featureFlagsFetchSucceeded) {
+    return false;
+  }
+  return defaultValue;
 }
 async function isFeatureEnabledAsync(flagName, defaultValue = false) {
   if (!featureFlagsFetchedAt || Date.now() - featureFlagsFetchedAt > FEATURE_FLAGS_TTL) {
     await fetchFeatureFlags();
   }
   const value = featureFlagsCache[flagName];
-  if (value === void 0) return defaultValue;
-  return value === true || value === "true";
+  if (value !== void 0) {
+    const enabled = value === true || value === "true";
+    console.error(`[socials-plugin] Flag ${flagName} = ${value} (enabled: ${enabled})`);
+    return enabled;
+  }
+  if (featureFlagsFetchSucceeded) {
+    console.error(`[socials-plugin] Flag ${flagName} not in cache (fetch succeeded) \u2192 disabled`);
+    return false;
+  }
+  console.error(`[socials-plugin] Flag ${flagName} not in cache (fetch failed) \u2192 default: ${defaultValue}`);
+  return defaultValue;
 }
 var PlatformFlags = {
   x: "mcp_platform_x",
@@ -26603,7 +26623,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
   const platform = args && typeof args === "object" && "platform" in args ? String(args.platform) : void 0;
   const getElapsed = createTimer();
-  if (!await isToolEnabledAsync(name)) {
+  const toolEnabled = await isToolEnabledAsync(name);
+  console.error(`[socials-plugin] Tool gating check: ${name} \u2192 enabled: ${toolEnabled}`);
+  if (!toolEnabled) {
     return {
       content: [
         {
