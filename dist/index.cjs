@@ -25315,7 +25315,7 @@ var featureFlagsCache = {};
 var featureFlagsFetchedAt = null;
 var featureFlagsFetchPromise = null;
 var featureFlagsFetchSucceeded = false;
-var FEATURE_FLAGS_TTL = 5 * 60 * 1e3;
+var FEATURE_FLAGS_TTL = 30 * 1e3;
 function getDistinctId() {
   return userId || `anon_${anonymousMachineId}`;
 }
@@ -25406,6 +25406,10 @@ async function ensureFeatureFlagsLoaded() {
   if (!featureFlagsFetchedAt) {
     await fetchFeatureFlags();
   }
+}
+async function forceRefreshFeatureFlags() {
+  featureFlagsFetchedAt = null;
+  await fetchFeatureFlags();
 }
 function isFeatureEnabled(flagName, defaultValue = false) {
   if (!featureFlagsFetchedAt || Date.now() - featureFlagsFetchedAt > FEATURE_FLAGS_TTL) {
@@ -25549,7 +25553,15 @@ function getFeatureGatingStatus() {
       reddit: isPlatformEnabled("reddit")
     },
     tools: Object.fromEntries(Object.keys(ToolFlags).map((t) => [t, isToolEnabled(t)])),
-    disabled_tools: getDisabledTools()
+    disabled_tools: getDisabledTools(),
+    debug: {
+      flags_fetched: featureFlagsFetchedAt !== null,
+      flags_fetch_succeeded: featureFlagsFetchSucceeded,
+      flags_age_seconds: featureFlagsFetchedAt ? Math.round((Date.now() - featureFlagsFetchedAt) / 1e3) : null,
+      flags_ttl_seconds: FEATURE_FLAGS_TTL / 1e3,
+      raw_flags: { ...featureFlagsCache },
+      distinct_id: getDistinctId()
+    }
   };
 }
 function calculateEngagementScore() {
@@ -26605,10 +26617,15 @@ var allTools = [
   // Diagnostics tool
   {
     name: "socials_diagnostics",
-    description: "Get diagnostics info: health metrics, engagement score, feature flags. Useful for debugging and understanding plugin state.",
+    description: "Get diagnostics info: health metrics, engagement score, feature flags. Use refresh=true to force-refresh feature flags from PostHog.",
     inputSchema: {
       type: "object",
-      properties: {},
+      properties: {
+        refresh: {
+          type: "boolean",
+          description: "Force refresh feature flags from PostHog (bypasses cache)"
+        }
+      },
       required: []
     }
   }
@@ -26624,8 +26641,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const platform = args && typeof args === "object" && "platform" in args ? String(args.platform) : void 0;
   const getElapsed = createTimer();
   const toolEnabled = await isToolEnabledAsync(name);
-  console.error(`[socials-plugin] Tool gating check: ${name} \u2192 enabled: ${toolEnabled}`);
   if (!toolEnabled) {
+    const gatingStatus = getFeatureGatingStatus();
     return {
       content: [
         {
@@ -26633,7 +26650,14 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           text: JSON.stringify({
             error: true,
             message: `Tool "${name}" is currently disabled. Contact support if you believe this is an error.`,
-            feature_gated: true
+            feature_gated: true,
+            debug: {
+              tool: name,
+              flags_fetched: gatingStatus.debug.flags_fetched,
+              flags_fetch_succeeded: gatingStatus.debug.flags_fetch_succeeded,
+              flags_age_seconds: gatingStatus.debug.flags_age_seconds,
+              raw_flags: gatingStatus.debug.raw_flags
+            }
           })
         }
       ],
@@ -27246,6 +27270,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       //   };
       // }
       case "socials_diagnostics": {
+        const refresh = args?.refresh;
+        if (refresh) {
+          await forceRefreshFeatureFlags();
+        }
         const health = getHealthMetrics();
         const engagement = getEngagementScore();
         const extensionConnected = bridge.isConnected();
@@ -27256,11 +27284,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
               type: "text",
               text: JSON.stringify({
                 status: "ok",
-                version: "1.0.16",
+                version: "1.0.21",
                 extension_connected: extensionConnected,
                 health,
                 engagement,
-                feature_gating: featureGating
+                feature_gating: featureGating,
+                refreshed: refresh || false
               }, null, 2)
             }
           ]

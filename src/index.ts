@@ -35,6 +35,7 @@ import {
   isToolEnabledAsync,
   isPlatformEnabledAsync,
   ensureFeatureFlagsLoaded,
+  forceRefreshFeatureFlags,
   getFeatureGatingStatus,
 } from "./analytics.js";
 
@@ -686,10 +687,15 @@ const allTools = [
         name: "socials_diagnostics",
         description:
           "Get diagnostics info: health metrics, engagement score, feature flags. " +
-          "Useful for debugging and understanding plugin state.",
+          "Use refresh=true to force-refresh feature flags from PostHog.",
         inputSchema: {
           type: "object",
-          properties: {},
+          properties: {
+            refresh: {
+              type: "boolean",
+              description: "Force refresh feature flags from PostHog (bypasses cache)",
+            },
+          },
           required: [],
         },
       },
@@ -719,8 +725,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
   // Check if tool is enabled via feature flags (async to ensure flags are loaded)
   const toolEnabled = await isToolEnabledAsync(name);
-  console.error(`[socials-plugin] Tool gating check: ${name} → enabled: ${toolEnabled}`);
   if (!toolEnabled) {
+    const gatingStatus = getFeatureGatingStatus();
     return {
       content: [
         {
@@ -729,6 +735,13 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             error: true,
             message: `Tool "${name}" is currently disabled. Contact support if you believe this is an error.`,
             feature_gated: true,
+            debug: {
+              tool: name,
+              flags_fetched: gatingStatus.debug.flags_fetched,
+              flags_fetch_succeeded: gatingStatus.debug.flags_fetch_succeeded,
+              flags_age_seconds: gatingStatus.debug.flags_age_seconds,
+              raw_flags: gatingStatus.debug.raw_flags,
+            },
           }),
         },
       ],
@@ -1470,11 +1483,18 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       // }
 
       case "socials_diagnostics": {
+        const refresh = (args as { refresh?: boolean })?.refresh;
+
+        // Force refresh flags if requested
+        if (refresh) {
+          await forceRefreshFeatureFlags();
+        }
+
         const health = getHealthMetrics();
         const engagement = getEngagementScore();
         const extensionConnected = bridge.isConnected();
 
-        // Get feature gating status
+        // Get feature gating status (includes debug info)
         const featureGating = getFeatureGatingStatus();
 
         return {
@@ -1483,11 +1503,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
               type: "text",
               text: JSON.stringify({
                 status: "ok",
-                version: "1.0.16",
+                version: "1.0.21",
                 extension_connected: extensionConnected,
                 health,
                 engagement,
                 feature_gating: featureGating,
+                refreshed: refresh || false,
               }, null, 2),
             },
           ],

@@ -53,7 +53,7 @@ let featureFlagsCache: Record<string, boolean | string> = {};
 let featureFlagsFetchedAt: number | null = null;
 let featureFlagsFetchPromise: Promise<void> | null = null;
 let featureFlagsFetchSucceeded: boolean = false; // Track if last fetch was successful
-const FEATURE_FLAGS_TTL = 5 * 60 * 1000; // 5 minutes
+const FEATURE_FLAGS_TTL = 30 * 1000; // 30 seconds - refresh frequently for real-time flag changes
 
 /**
  * Get the distinct ID to use for PostHog events.
@@ -195,6 +195,14 @@ export async function ensureFeatureFlagsLoaded(): Promise<void> {
   if (!featureFlagsFetchedAt) {
     await fetchFeatureFlags();
   }
+}
+
+/**
+ * Force refresh feature flags (bypass TTL)
+ */
+export async function forceRefreshFeatureFlags(): Promise<void> {
+  featureFlagsFetchedAt = null; // Reset to force fetch
+  await fetchFeatureFlags();
 }
 
 /**
@@ -397,6 +405,14 @@ export function getFeatureGatingStatus(): {
   platforms: Record<string, boolean>;
   tools: Record<string, boolean>;
   disabled_tools: string[];
+  debug: {
+    flags_fetched: boolean;
+    flags_fetch_succeeded: boolean;
+    flags_age_seconds: number | null;
+    flags_ttl_seconds: number;
+    raw_flags: Record<string, boolean | string>;
+    distinct_id: string;
+  };
 } {
   return {
     platforms: {
@@ -406,6 +422,14 @@ export function getFeatureGatingStatus(): {
     },
     tools: Object.fromEntries(Object.keys(ToolFlags).map(t => [t, isToolEnabled(t)])),
     disabled_tools: getDisabledTools(),
+    debug: {
+      flags_fetched: featureFlagsFetchedAt !== null,
+      flags_fetch_succeeded: featureFlagsFetchSucceeded,
+      flags_age_seconds: featureFlagsFetchedAt ? Math.round((Date.now() - featureFlagsFetchedAt) / 1000) : null,
+      flags_ttl_seconds: FEATURE_FLAGS_TTL / 1000,
+      raw_flags: { ...featureFlagsCache },
+      distinct_id: getDistinctId(),
+    },
   };
 }
 
