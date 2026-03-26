@@ -25292,13 +25292,12 @@ var posthog = new PostHog(POSTHOG_API_KEY, {
   flushInterval: 0
   // Disable batching interval
 });
-posthog.debug(true);
 function getAnonymousMachineId() {
   const raw = `${(0, import_os.hostname)()}-${process.env.USER || process.env.USERNAME || "unknown"}`;
   return (0, import_crypto2.createHash)("sha256").update(raw).digest("hex").slice(0, 16);
 }
 var anonymousMachineId = getAnonymousMachineId();
-var pluginVersion = "1.0.22";
+var pluginVersion = "1.0.23";
 var userId = null;
 var userEmail = null;
 var userTier = null;
@@ -25388,11 +25387,9 @@ async function fetchFeatureFlagsInternal() {
     featureFlagsCache = flags || {};
     featureFlagsFetchedAt = Date.now();
     featureFlagsFetchSucceeded = true;
-    console.error(`[socials-plugin] Feature flags loaded: ${JSON.stringify(featureFlagsCache)}`);
-  } catch (error2) {
+  } catch {
     featureFlagsFetchedAt = Date.now();
     featureFlagsFetchSucceeded = false;
-    console.error(`[socials-plugin] Failed to fetch feature flags: ${error2}`);
   }
 }
 function fetchFeatureFlags() {
@@ -25431,15 +25428,11 @@ async function isFeatureEnabledAsync(flagName, defaultValue = false) {
   }
   const value = featureFlagsCache[flagName];
   if (value !== void 0) {
-    const enabled = value === true || value === "true";
-    console.error(`[socials-plugin] Flag ${flagName} = ${value} (enabled: ${enabled})`);
-    return enabled;
+    return value === true || value === "true";
   }
   if (featureFlagsFetchSucceeded) {
-    console.error(`[socials-plugin] Flag ${flagName} not in cache (fetch succeeded) \u2192 disabled`);
     return false;
   }
-  console.error(`[socials-plugin] Flag ${flagName} not in cache (fetch failed) \u2192 default: ${defaultValue}`);
   return defaultValue;
 }
 var PlatformFlags = {
@@ -25620,33 +25613,39 @@ function trackHealthMetrics() {
 }
 async function captureAsync(event, properties = {}) {
   const distinctId = getDistinctId();
-  const engagement = calculateEngagementScore();
-  const health = getHealthMetrics();
   try {
     await posthog.captureImmediate({
       distinctId,
       event,
       properties: {
+        // Core identification
         product: "socials",
-        source: "claude-plugins",
+        client: "claude_code",
+        client_type: "mcp_server",
+        source: "claude-code-plugin",
+        // Version info
         plugin_version: pluginVersion,
-        os_platform: process.platform,
+        $lib: "socials-mcp",
+        $lib_version: pluginVersion,
+        // Environment
+        os: process.platform,
+        os_name: process.platform === "darwin" ? "macOS" : process.platform === "win32" ? "Windows" : "Linux",
         node_version: process.version,
-        has_user_identity: !!userId,
+        // User context
+        user_id: userId,
+        user_email: userEmail,
         user_tier: userTier,
+        is_identified: !!userId,
+        // Session context
         session_tool_count: toolCallCount,
-        session_duration_ms: sessionStartTime ? Date.now() - sessionStartTime : null,
-        previous_tool: lastToolName,
-        engagement_score: engagement.score,
-        engagement_level: engagement.level,
-        memory_mb: health.memory_usage_mb,
-        extension_latency_ms: health.last_extension_latency_ms,
+        session_duration_seconds: sessionStartTime ? Math.round((Date.now() - sessionStartTime) / 1e3) : null,
+        // Group for tier-based analysis
         $groups: userTier ? { subscription_tier: userTier } : void 0,
+        // Event-specific properties (passed in)
         ...properties
       }
     });
-  } catch (error2) {
-    console.error(`[socials-plugin] Failed to send event ${event}:`, error2);
+  } catch {
   }
 }
 function capture(event, properties = {}) {

@@ -18,9 +18,6 @@ const posthog = new PostHog(POSTHOG_API_KEY, {
   flushInterval: 0, // Disable batching interval
 });
 
-// Enable debug logging for PostHog - logs to console
-posthog.debug(true);
-
 // Generate anonymous machine ID (hash of hostname + username) - fallback only
 function getAnonymousMachineId(): string {
   const raw = `${hostname()}-${process.env.USER || process.env.USERNAME || "unknown"}`;
@@ -28,7 +25,7 @@ function getAnonymousMachineId(): string {
 }
 
 const anonymousMachineId = getAnonymousMachineId();
-const pluginVersion = "1.0.22";
+const pluginVersion = "1.0.23";
 
 // User identity from extension (set when extension connects)
 let userId: string | null = null;
@@ -169,13 +166,10 @@ async function fetchFeatureFlagsInternal(): Promise<void> {
     featureFlagsCache = flags || {};
     featureFlagsFetchedAt = Date.now();
     featureFlagsFetchSucceeded = true;
-    // Log for debugging
-    console.error(`[socials-plugin] Feature flags loaded: ${JSON.stringify(featureFlagsCache)}`);
-  } catch (error) {
+  } catch {
     // On error, set fetched time to prevent constant retries
     featureFlagsFetchedAt = Date.now();
     featureFlagsFetchSucceeded = false;
-    console.error(`[socials-plugin] Failed to fetch feature flags: ${error}`);
   }
 }
 
@@ -251,18 +245,14 @@ export async function isFeatureEnabledAsync(flagName: string, defaultValue: bool
 
   // If flag is explicitly in cache, use its value
   if (value !== undefined) {
-    const enabled = value === true || value === "true";
-    console.error(`[socials-plugin] Flag ${flagName} = ${value} (enabled: ${enabled})`);
-    return enabled;
+    return value === true || value === "true";
   }
 
   // Flag not in cache - if fetch succeeded, treat as disabled; if fetch failed, use default
   if (featureFlagsFetchSucceeded) {
-    console.error(`[socials-plugin] Flag ${flagName} not in cache (fetch succeeded) → disabled`);
     return false; // Flag not found after successful fetch = disabled
   }
 
-  console.error(`[socials-plugin] Flag ${flagName} not in cache (fetch failed) → default: ${defaultValue}`);
   return defaultValue; // Graceful degradation on fetch failure
 }
 
@@ -532,35 +522,47 @@ export function trackHealthMetrics(): void {
  */
 async function captureAsync(event: string, properties: EventProperties = {}): Promise<void> {
   const distinctId = getDistinctId();
-  const engagement = calculateEngagementScore();
-  const health = getHealthMetrics();
 
   try {
     await posthog.captureImmediate({
       distinctId,
       event,
       properties: {
+        // Core identification
         product: "socials",
-        source: "claude-plugins",
+        client: "claude_code",
+        client_type: "mcp_server",
+        source: "claude-code-plugin",
+
+        // Version info
         plugin_version: pluginVersion,
-        os_platform: process.platform,
+        $lib: "socials-mcp",
+        $lib_version: pluginVersion,
+
+        // Environment
+        os: process.platform,
+        os_name: process.platform === "darwin" ? "macOS" : process.platform === "win32" ? "Windows" : "Linux",
         node_version: process.version,
-        has_user_identity: !!userId,
+
+        // User context
+        user_id: userId,
+        user_email: userEmail,
         user_tier: userTier,
+        is_identified: !!userId,
+
+        // Session context
         session_tool_count: toolCallCount,
-        session_duration_ms: sessionStartTime ? Date.now() - sessionStartTime : null,
-        previous_tool: lastToolName,
-        engagement_score: engagement.score,
-        engagement_level: engagement.level,
-        memory_mb: health.memory_usage_mb,
-        extension_latency_ms: health.last_extension_latency_ms,
+        session_duration_seconds: sessionStartTime ? Math.round((Date.now() - sessionStartTime) / 1000) : null,
+
+        // Group for tier-based analysis
         $groups: userTier ? { subscription_tier: userTier } : undefined,
+
+        // Event-specific properties (passed in)
         ...properties,
       },
     });
-  } catch (error) {
-    // Log but don't throw - analytics shouldn't break the app
-    console.error(`[socials-plugin] Failed to send event ${event}:`, error);
+  } catch {
+    // Silent fail - analytics shouldn't break the app
   }
 }
 
