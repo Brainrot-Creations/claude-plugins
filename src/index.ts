@@ -244,39 +244,40 @@ const allTools = [
           required: ["platform", "post_url"],
         },
       },
-      {
-        name: "socials_generate_reply",
-        description:
-          "OPTIONAL: Generate a reply using Socials AI with the user's persona. You can also write replies yourself without this tool.",
-        inputSchema: {
-          type: "object",
-          properties: {
-            platform: {
-              type: "string",
-              enum: ["x", "linkedin", "reddit"],
-              description: "Social media platform",
-            },
-            post_content: {
-              type: "string",
-              description: "The content of the post to reply to",
-            },
-            post_author: {
-              type: "string",
-              description: "The author/handle of the post",
-            },
-            persona_id: {
-              type: "string",
-              description: "Optional: specific persona ID to use",
-            },
-            mood: {
-              type: "string",
-              description:
-                "Optional: mood/tone (witty, professional, casual, etc.)",
-            },
-          },
-          required: ["platform", "post_content", "post_author"],
-        },
-      },
+      // DISABLED: socials_generate_reply - temporarily commented out
+      // {
+      //   name: "socials_generate_reply",
+      //   description:
+      //     "OPTIONAL: Generate a reply using Socials AI with the user's persona. You can also write replies yourself without this tool.",
+      //   inputSchema: {
+      //     type: "object",
+      //     properties: {
+      //       platform: {
+      //         type: "string",
+      //         enum: ["x", "linkedin", "reddit"],
+      //         description: "Social media platform",
+      //       },
+      //       post_content: {
+      //         type: "string",
+      //         description: "The content of the post to reply to",
+      //       },
+      //       post_author: {
+      //         type: "string",
+      //         description: "The author/handle of the post",
+      //       },
+      //       persona_id: {
+      //         type: "string",
+      //         description: "Optional: specific persona ID to use",
+      //       },
+      //       mood: {
+      //         type: "string",
+      //         description:
+      //           "Optional: mood/tone (witty, professional, casual, etc.)",
+      //       },
+      //     },
+      //     required: ["platform", "post_content", "post_author"],
+      //   },
+      // },
       {
         name: "socials_quick_reply",
         description:
@@ -918,39 +919,40 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         };
       }
 
-      case "socials_generate_reply": {
-        await requireProAccess();
-        const parsed = GenerateReplySchema.parse(args);
-        const result = await bridge.generateReply(
-          parsed.platform,
-          parsed.post_content,
-          parsed.post_author,
-          parsed.persona_id,
-          parsed.mood,
-        );
-
-        // Track persona usage if specified
-        if (result.metadata?.personaUsed) {
-          trackPersonaUsed(parsed.persona_id || "default", result.metadata.personaUsed);
-        }
-
-        // Track tool usage
-        const elapsed = getElapsed();
-        await trackToolUsage(name, parsed.platform, true, elapsed);
-
-        return {
-          content: [
-            {
-              type: "text",
-              text: JSON.stringify({
-                success: true,
-                generatedReply: result.content,
-                metadata: result.metadata,
-              }),
-            },
-          ],
-        };
-      }
+      // DISABLED: socials_generate_reply handler - temporarily commented out
+      // case "socials_generate_reply": {
+      //   await requireProAccess();
+      //   const parsed = GenerateReplySchema.parse(args);
+      //   const result = await bridge.generateReply(
+      //     parsed.platform,
+      //     parsed.post_content,
+      //     parsed.post_author,
+      //     parsed.persona_id,
+      //     parsed.mood,
+      //   );
+      //
+      //   // Track persona usage if specified
+      //   if (result.metadata?.personaUsed) {
+      //     trackPersonaUsed(parsed.persona_id || "default", result.metadata.personaUsed);
+      //   }
+      //
+      //   // Track tool usage
+      //   const elapsed = getElapsed();
+      //   await trackToolUsage(name, parsed.platform, true, elapsed);
+      //
+      //   return {
+      //     content: [
+      //       {
+      //         type: "text",
+      //         text: JSON.stringify({
+      //           success: true,
+      //           generatedReply: result.content,
+      //           metadata: result.metadata,
+      //         }),
+      //       },
+      //     ],
+      //   };
+      // }
 
       case "socials_quick_reply": {
         await requireProAccess();
