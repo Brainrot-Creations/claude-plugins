@@ -8,17 +8,24 @@
   <strong>Give Claude superpowers on X, LinkedIn, and Reddit.</strong>
 </p>
 
+Open your terminal and run:
+
+**Step 1:** Start Claude Code
 ```bash
 claude
 ```
+
+**Step 2:** Add the marketplace
 ```
 /plugin marketplace add Brainrot-Creations/claude-plugins
 ```
+
+**Step 3:** Install the plugin
 ```
 /plugin install socials@brainrot-creations
 ```
 
-That's it.
+Done.
 
 ---
 
