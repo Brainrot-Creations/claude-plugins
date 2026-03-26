@@ -1052,7 +1052,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         }
 
         const personas = await bridge.listPersonas();
-        await trackToolUsage(name, "browser", true, getElapsed());
+        await trackToolUsage(name, null, true, getElapsed());
 
         // Return concise list: just name and id
         return {
@@ -1072,7 +1072,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         await requireProAccess();
         const parsed = OpenTabSchema.parse(args);
         const result = await bridge.openTab(parsed.url, parsed.focus);
-        await trackToolUsage(name, "browser", true, getElapsed());
+        await trackToolUsage(name, null, true, getElapsed());
 
         return {
           content: [
@@ -1096,7 +1096,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         await requireProAccess();
         const parsed = NavigateToSchema.parse(args);
         const result = await bridge.navigateTo(parsed.url, parsed.tab_id);
-        await trackToolUsage(name, "browser", true, getElapsed());
+        await trackToolUsage(name, null, true, getElapsed());
 
         return {
           content: [
@@ -1119,7 +1119,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         }
 
         const result = await bridge.getActiveTab();
-        await trackToolUsage(name, "browser", true, getElapsed());
+        await trackToolUsage(name, null, true, getElapsed());
 
         return {
           content: [
@@ -1145,7 +1145,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         }
 
         const agent = await bridge.getAgentTab();
-        await trackToolUsage(name, "browser", true, getElapsed());
+        await trackToolUsage(name, null, true, getElapsed());
 
         return {
           content: [
@@ -1174,7 +1174,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case "socials_focus_agent_tab": {
         await requireProAccess();
         const result = await bridge.focusAgentTab();
-        await trackToolUsage(name, "browser", true, getElapsed());
+        await trackToolUsage(name, null, true, getElapsed());
 
         return {
           content: [
@@ -1195,7 +1195,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         await requireProAccess();
         const parsed = SetAgentTabSchema.parse(args);
         const result = await bridge.setAgentTab(parsed.tab_id);
-        await trackToolUsage(name, "browser", true, getElapsed());
+        await trackToolUsage(name, null, true, getElapsed());
 
         return {
           content: [
@@ -1216,7 +1216,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         await requireProAccess();
         const parsed = ReloadTabSchema.parse(args);
         await bridge.reloadTab(parsed.tab_id);
-        await trackToolUsage(name, "browser", true, getElapsed());
+        await trackToolUsage(name, null, true, getElapsed());
 
         return {
           content: [
@@ -1264,7 +1264,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const direction = (args as { direction?: string })?.direction || "down";
         const amount = (args as { amount?: number })?.amount || 800;
         await bridge.scrollPage(direction, amount);
-        await trackToolUsage(name, "browser", true, getElapsed());
+        await trackToolUsage(name, null, true, getElapsed());
 
         return {
           content: [
@@ -1517,7 +1517,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
         // Get feature gating status (includes debug info)
         const featureGating = getFeatureGatingStatus();
-        await trackToolUsage(name, "core", true, getElapsed());
+        await trackToolUsage(name, null, true, getElapsed());
 
         return {
           content: [

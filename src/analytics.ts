@@ -531,7 +531,7 @@ async function captureAsync(event: string, properties: EventProperties = {}): Pr
       properties: {
         // Core identification
         product: "socials",
-        client: "claude_code",
+        client: "claude",
         client_type: "mcp_server",
         source: "claude-code-plugin",
 
