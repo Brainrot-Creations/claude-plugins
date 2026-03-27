@@ -89,6 +89,19 @@ export interface SubmitReplyPayload {
 export interface CreatePostPayload {
   platform: "x";
   content: string;
+  /** Optional media attachments (images, videos, GIFs). */
+  media?: Array<{
+    /** URL to the media file OR local file path (will be read and converted to base64) */
+    url?: string;
+    /** Base64-encoded file data (set by MCP server when reading local files) */
+    data?: string;
+    /** Original filename */
+    filename?: string;
+    /** MIME type */
+    mimeType?: string;
+    /** Media type hint */
+    type: "image" | "video" | "gif";
+  }>;
 }
 
 export type EngageActionType = "like" | "repost" | "bookmark" | "share";

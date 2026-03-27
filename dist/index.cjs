@@ -3223,8 +3223,8 @@ var require_utils = __commonJS({
       }
       return ind;
     }
-    function removeDotSegments(path) {
-      let input = path;
+    function removeDotSegments(path2) {
+      let input = path2;
       const output = [];
       let nextSlash = -1;
       let len = 0;
@@ -3423,8 +3423,8 @@ var require_schemes = __commonJS({
         wsComponent.secure = void 0;
       }
       if (wsComponent.resourceName) {
-        const [path, query] = wsComponent.resourceName.split("?");
-        wsComponent.path = path && path !== "/" ? path : void 0;
+        const [path2, query] = wsComponent.resourceName.split("?");
+        wsComponent.path = path2 && path2 !== "/" ? path2 : void 0;
         wsComponent.query = query;
         wsComponent.resourceName = void 0;
       }
@@ -6786,12 +6786,12 @@ var require_dist = __commonJS({
         throw new Error(`Unknown format "${name}"`);
       return f;
     };
-    function addFormats(ajv, list, fs, exportName) {
+    function addFormats(ajv, list, fs2, exportName) {
       var _a;
       var _b;
       (_a = (_b = ajv.opts.code).formats) !== null && _a !== void 0 ? _a : _b.formats = (0, codegen_1._)`require("ajv-formats/dist/formats").${exportName}`;
       for (const f of list)
-        ajv.addFormat(f, fs[f]);
+        ajv.addFormat(f, fs2[f]);
     }
     module2.exports = exports2 = formatsPlugin;
     Object.defineProperty(exports2, "__esModule", { value: true });
@@ -10893,8 +10893,8 @@ function getErrorMap() {
 
 // node_modules/zod/v3/helpers/parseUtil.js
 var makeIssue = (params) => {
-  const { data, path, errorMaps, issueData } = params;
-  const fullPath = [...path, ...issueData.path || []];
+  const { data, path: path2, errorMaps, issueData } = params;
+  const fullPath = [...path2, ...issueData.path || []];
   const fullIssue = {
     ...issueData,
     path: fullPath
@@ -11010,11 +11010,11 @@ var errorUtil;
 
 // node_modules/zod/v3/types.js
 var ParseInputLazyPath = class {
-  constructor(parent, value, path, key) {
+  constructor(parent, value, path2, key) {
     this._cachedPath = [];
     this.parent = parent;
     this.data = value;
-    this._path = path;
+    this._path = path2;
     this._key = key;
   }
   get path() {
@@ -14651,10 +14651,10 @@ function assignProp(target, prop, value) {
     configurable: true
   });
 }
-function getElementAtPath(obj, path) {
-  if (!path)
+function getElementAtPath(obj, path2) {
+  if (!path2)
     return obj;
-  return path.reduce((acc, key) => acc?.[key], obj);
+  return path2.reduce((acc, key) => acc?.[key], obj);
 }
 function promiseAllObject(promisesObj) {
   const keys = Object.keys(promisesObj);
@@ -14974,11 +14974,11 @@ function aborted(x, startIndex = 0) {
   }
   return false;
 }
-function prefixIssues(path, issues) {
+function prefixIssues(path2, issues) {
   return issues.map((iss) => {
     var _a;
     (_a = iss).path ?? (_a.path = []);
-    iss.path.unshift(path);
+    iss.path.unshift(path2);
     return iss;
   });
 }
@@ -21519,6 +21519,10 @@ var StdioServerTransport = class {
   }
 };
 
+// src/index.ts
+var fs = __toESM(require("fs"), 1);
+var path = __toESM(require("path"), 1);
+
 // src/extension-bridge.ts
 var import_child_process = require("child_process");
 
@@ -21562,8 +21566,8 @@ function createGetModuleFromFilename(basePath = process.argv[1] ? (0, import_pat
     return decodedFile;
   };
 }
-function normalizeWindowsPath(path) {
-  return path.replace(/^[A-Z]:/, "").replace(/\\/g, "/");
+function normalizeWindowsPath(path2) {
+  return path2.replace(/^[A-Z]:/, "").replace(/\\/g, "/");
 }
 
 // node_modules/@posthog/core/dist/featureFlagUtils.mjs
@@ -23713,9 +23717,9 @@ async function addSourceContext(frames) {
   LRU_FILE_CONTENTS_CACHE.reduce();
   return frames;
 }
-function getContextLinesFromFile(path, ranges, output) {
+function getContextLinesFromFile(path2, ranges, output) {
   return new Promise((resolve) => {
-    const stream = (0, import_node_fs.createReadStream)(path);
+    const stream = (0, import_node_fs.createReadStream)(path2);
     const lineReaded = (0, import_node_readline.createInterface)({
       input: stream
     });
@@ -23730,7 +23734,7 @@ function getContextLinesFromFile(path, ranges, output) {
     let rangeStart = range[0];
     let rangeEnd = range[1];
     function onStreamError() {
-      LRU_FILE_CONTENTS_FS_READ_FAILED.set(path, 1);
+      LRU_FILE_CONTENTS_FS_READ_FAILED.set(path2, 1);
       lineReaded.close();
       lineReaded.removeAllListeners();
       destroyStreamAndResolve();
@@ -23791,8 +23795,8 @@ function clearLineContext(frame) {
   delete frame.context_line;
   delete frame.post_context;
 }
-function shouldSkipContextLinesForFile(path) {
-  return path.startsWith("node:") || path.endsWith(".min.js") || path.endsWith(".min.cjs") || path.endsWith(".min.mjs") || path.startsWith("data:");
+function shouldSkipContextLinesForFile(path2) {
+  return path2.startsWith("node:") || path2.endsWith(".min.js") || path2.endsWith(".min.cjs") || path2.endsWith(".min.mjs") || path2.startsWith("data:");
 }
 function shouldSkipContextLinesForFrame(frame) {
   if (void 0 !== frame.lineno && frame.lineno > MAX_CONTEXTLINES_LINENO) return true;
@@ -25775,9 +25779,6 @@ function trackConnectionRequest(success, hasNote, durationMs) {
   if (success) sessionConnectionRequests++;
   capture("mcp_connection_request", { social_platform: "linkedin", success, has_note: hasNote, duration_ms: durationMs });
 }
-function trackPersonaUsed(personaId, personaName) {
-  capture("mcp_persona_used", { persona_id: personaId, persona_name: personaName, is_custom: !personaId.startsWith("system_") });
-}
 function trackFeedViewed(platform, postCount, durationMs) {
   capture("mcp_feed_viewed", { social_platform: platform, post_count: postCount, duration_ms: durationMs });
 }
@@ -26155,9 +26156,19 @@ var GenerateReplySchema = external_exports.object({
   persona_id: external_exports.string().optional().describe("Persona ID to use for generation"),
   mood: external_exports.string().optional().describe("Mood/tone for the reply (e.g., witty, professional)")
 });
+var CreatePostMediaSchema = external_exports.object({
+  path: external_exports.string().optional().describe("Local file path or URL to the media file"),
+  url: external_exports.string().optional().describe("Alias for path (for backwards compatibility)"),
+  type: external_exports.enum(["image", "video", "gif"]).describe("Type of media")
+}).transform((item) => ({
+  // Normalize: prefer 'path', fallback to 'url'
+  path: item.path || item.url || "",
+  type: item.type
+}));
 var CreatePostSchema = external_exports.object({
   platform: external_exports.literal("x").describe("Only X (Twitter) is supported for new posts via the extension"),
-  content: external_exports.string().min(1).describe("Full text of the new post (X character limits apply)")
+  content: external_exports.string().min(1).describe("Full text of the new post (X character limits apply)"),
+  media: external_exports.array(CreatePostMediaSchema).optional().describe("Optional media attachments. Accepts local file paths (e.g., /path/to/image.png) or URLs.")
 });
 var EngagePostSchema = external_exports.object({
   platform: external_exports.literal("x").describe("Only X is supported for feed engagement via the extension"),
@@ -26269,37 +26280,40 @@ var allTools = [
       required: ["platform", "post_url"]
     }
   },
-  {
-    name: "socials_generate_reply",
-    description: "OPTIONAL: Generate a reply using Socials AI with the user's persona. You can also write replies yourself without this tool.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        platform: {
-          type: "string",
-          enum: ["x", "linkedin", "reddit"],
-          description: "Social media platform"
-        },
-        post_content: {
-          type: "string",
-          description: "The content of the post to reply to"
-        },
-        post_author: {
-          type: "string",
-          description: "The author/handle of the post"
-        },
-        persona_id: {
-          type: "string",
-          description: "Optional: specific persona ID to use"
-        },
-        mood: {
-          type: "string",
-          description: "Optional: mood/tone (witty, professional, casual, etc.)"
-        }
-      },
-      required: ["platform", "post_content", "post_author"]
-    }
-  },
+  // DISABLED: socials_generate_reply - temporarily commented out
+  // {
+  //   name: "socials_generate_reply",
+  //   description:
+  //     "OPTIONAL: Generate a reply using Socials AI with the user's persona. You can also write replies yourself without this tool.",
+  //   inputSchema: {
+  //     type: "object",
+  //     properties: {
+  //       platform: {
+  //         type: "string",
+  //         enum: ["x", "linkedin", "reddit"],
+  //         description: "Social media platform",
+  //       },
+  //       post_content: {
+  //         type: "string",
+  //         description: "The content of the post to reply to",
+  //       },
+  //       post_author: {
+  //         type: "string",
+  //         description: "The author/handle of the post",
+  //       },
+  //       persona_id: {
+  //         type: "string",
+  //         description: "Optional: specific persona ID to use",
+  //       },
+  //       mood: {
+  //         type: "string",
+  //         description:
+  //           "Optional: mood/tone (witty, professional, casual, etc.)",
+  //       },
+  //     },
+  //     required: ["platform", "post_content", "post_author"],
+  //   },
+  // },
   {
     name: "socials_quick_reply",
     description: "Reply from the pinned agent tab's feed (see socials_open_tab)\u2014that tab need not be focused. Clicks reply on the tweet, types the content, and posts. You can write the reply yourself OR use socials_generate_reply first if you want to use the user's persona. IMPORTANT: Always confirm with the user before posting.",
@@ -26320,7 +26334,7 @@ var allTools = [
   },
   {
     name: "socials_create_post",
-    description: "Publish a new original post on X (not a reply) in the pinned agent tab (need not be focused). Opens the compose dialog from the sidebar, fills the text, and clicks Post. Agent tab should be on X (e.g. https://x.com/home) with the left nav visible. IMPORTANT: Always confirm the exact text with the user before calling this tool.",
+    description: "Publish a new original post on X (not a reply) in the pinned agent tab (need not be focused). Opens the compose dialog from the sidebar, fills the text, optionally attaches media, and clicks Post. Agent tab should be on X (e.g. https://x.com/home) with the left nav visible. IMPORTANT: Always confirm the exact text with the user before calling this tool.",
     inputSchema: {
       type: "object",
       properties: {
@@ -26332,6 +26346,25 @@ var allTools = [
         content: {
           type: "string",
           description: "Full post body to publish"
+        },
+        media: {
+          type: "array",
+          description: "Optional media attachments (images, videos, GIFs). Accepts local file paths or URLs. Max 4 images or 1 video/GIF per post.",
+          items: {
+            type: "object",
+            properties: {
+              path: {
+                type: "string",
+                description: "Local file path (e.g., /Users/me/image.png) or URL to the media file"
+              },
+              type: {
+                type: "string",
+                enum: ["image", "video", "gif"],
+                description: "Type of media"
+              }
+            },
+            required: ["path", "type"]
+          }
         }
       },
       required: ["platform", "content"]
@@ -26840,34 +26873,40 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           ]
         };
       }
-      case "socials_generate_reply": {
-        await requireProAccess();
-        const parsed = GenerateReplySchema.parse(args);
-        const result = await bridge.generateReply(
-          parsed.platform,
-          parsed.post_content,
-          parsed.post_author,
-          parsed.persona_id,
-          parsed.mood
-        );
-        if (result.metadata?.personaUsed) {
-          trackPersonaUsed(parsed.persona_id || "default", result.metadata.personaUsed);
-        }
-        const elapsed = getElapsed();
-        await trackToolUsage(name, parsed.platform, true, elapsed);
-        return {
-          content: [
-            {
-              type: "text",
-              text: JSON.stringify({
-                success: true,
-                generatedReply: result.content,
-                metadata: result.metadata
-              })
-            }
-          ]
-        };
-      }
+      // DISABLED: socials_generate_reply handler - temporarily commented out
+      // case "socials_generate_reply": {
+      //   await requireProAccess();
+      //   const parsed = GenerateReplySchema.parse(args);
+      //   const result = await bridge.generateReply(
+      //     parsed.platform,
+      //     parsed.post_content,
+      //     parsed.post_author,
+      //     parsed.persona_id,
+      //     parsed.mood,
+      //   );
+      //
+      //   // Track persona usage if specified
+      //   if (result.metadata?.personaUsed) {
+      //     trackPersonaUsed(parsed.persona_id || "default", result.metadata.personaUsed);
+      //   }
+      //
+      //   // Track tool usage
+      //   const elapsed = getElapsed();
+      //   await trackToolUsage(name, parsed.platform, true, elapsed);
+      //
+      //   return {
+      //     content: [
+      //       {
+      //         type: "text",
+      //         text: JSON.stringify({
+      //           success: true,
+      //           generatedReply: result.content,
+      //           metadata: result.metadata,
+      //         }),
+      //       },
+      //     ],
+      //   };
+      // }
       case "socials_quick_reply": {
         await requireProAccess();
         const postId = args.post_id;
@@ -26891,9 +26930,48 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case "socials_create_post": {
         await requireProAccess();
         const parsed = CreatePostSchema.parse(args);
+        const processedMedia = parsed.media ? await Promise.all(
+          parsed.media.map(async (item) => {
+            let normalizedPath = item.path;
+            if (normalizedPath.startsWith("file://")) {
+              normalizedPath = normalizedPath.slice(7);
+            }
+            const isUrl = normalizedPath.startsWith("http://") || normalizedPath.startsWith("https://");
+            if (isUrl) {
+              return { url: normalizedPath, type: item.type };
+            } else {
+              const filePath = normalizedPath.startsWith("~") ? normalizedPath.replace("~", process.env.HOME || "") : normalizedPath;
+              if (!fs.existsSync(filePath)) {
+                throw new Error(`Media file not found: ${filePath}. Make sure the file exists and the path is correct.`);
+              }
+              const fileBuffer = fs.readFileSync(filePath);
+              const base64Data = fileBuffer.toString("base64");
+              const filename = path.basename(filePath);
+              const ext = path.extname(filePath).toLowerCase().slice(1);
+              const mimeTypes = {
+                jpg: "image/jpeg",
+                jpeg: "image/jpeg",
+                png: "image/png",
+                gif: "image/gif",
+                webp: "image/webp",
+                mp4: "video/mp4",
+                mov: "video/quicktime",
+                webm: "video/webm"
+              };
+              const mimeType = mimeTypes[ext] || "application/octet-stream";
+              return {
+                data: base64Data,
+                filename,
+                mimeType,
+                type: item.type
+              };
+            }
+          })
+        ) : void 0;
         const result = await bridge.createPost({
           platform: parsed.platform,
-          content: parsed.content
+          content: parsed.content,
+          media: processedMedia
         });
         const elapsed = getElapsed();
         trackPostCreated(parsed.platform, parsed.content, result.success, elapsed);

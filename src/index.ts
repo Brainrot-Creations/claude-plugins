@@ -7,6 +7,8 @@ import {
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
+import * as fs from "fs";
+import * as path from "path";
 import { ExtensionBridge } from "./extension-bridge.js";
 import {
   trackServerStart,
@@ -79,6 +81,16 @@ const GenerateReplySchema = z.object({
     .describe("Mood/tone for the reply (e.g., witty, professional)"),
 });
 
+const CreatePostMediaSchema = z.object({
+  path: z.string().optional().describe("Local file path or URL to the media file"),
+  url: z.string().optional().describe("Alias for path (for backwards compatibility)"),
+  type: z.enum(["image", "video", "gif"]).describe("Type of media"),
+}).transform((item) => ({
+  // Normalize: prefer 'path', fallback to 'url'
+  path: item.path || item.url || "",
+  type: item.type,
+}));
+
 const CreatePostSchema = z.object({
   platform: z
     .literal("x")
@@ -87,6 +99,10 @@ const CreatePostSchema = z.object({
     .string()
     .min(1)
     .describe("Full text of the new post (X character limits apply)"),
+  media: z
+    .array(CreatePostMediaSchema)
+    .optional()
+    .describe("Optional media attachments. Accepts local file paths (e.g., /path/to/image.png) or URLs."),
 });
 
 const EngagePostSchema = z.object({
@@ -304,7 +320,7 @@ const allTools = [
         name: "socials_create_post",
         description:
           "Publish a new original post on X (not a reply) in the pinned agent tab (need not be focused). " +
-          "Opens the compose dialog from the sidebar, fills the text, and clicks Post. " +
+          "Opens the compose dialog from the sidebar, fills the text, optionally attaches media, and clicks Post. " +
           "Agent tab should be on X (e.g. https://x.com/home) with the left nav visible. " +
           "IMPORTANT: Always confirm the exact text with the user before calling this tool.",
         inputSchema: {
@@ -318,6 +334,26 @@ const allTools = [
             content: {
               type: "string",
               description: "Full post body to publish",
+            },
+            media: {
+              type: "array",
+              description:
+                "Optional media attachments (images, videos, GIFs). Accepts local file paths or URLs. Max 4 images or 1 video/GIF per post.",
+              items: {
+                type: "object",
+                properties: {
+                  path: {
+                    type: "string",
+                    description: "Local file path (e.g., /Users/me/image.png) or URL to the media file",
+                  },
+                  type: {
+                    type: "string",
+                    enum: ["image", "video", "gif"],
+                    description: "Type of media",
+                  },
+                },
+                required: ["path", "type"],
+              },
             },
           },
           required: ["platform", "content"],
@@ -982,9 +1018,65 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case "socials_create_post": {
         await requireProAccess();
         const parsed = CreatePostSchema.parse(args);
+
+        // Process media: convert local files to base64, keep URLs as-is
+        const processedMedia = parsed.media
+          ? await Promise.all(
+              parsed.media.map(async (item) => {
+                // Normalize the path - strip file:// protocol if present
+                let normalizedPath = item.path;
+                if (normalizedPath.startsWith("file://")) {
+                  normalizedPath = normalizedPath.slice(7); // Remove "file://"
+                }
+
+                const isUrl = normalizedPath.startsWith("http://") || normalizedPath.startsWith("https://");
+
+                if (isUrl) {
+                  // URL - extension will fetch it
+                  return { url: normalizedPath, type: item.type };
+                } else {
+                  // Local file - read and convert to base64
+                  const filePath = normalizedPath.startsWith("~")
+                    ? normalizedPath.replace("~", process.env.HOME || "")
+                    : normalizedPath;
+
+                  if (!fs.existsSync(filePath)) {
+                    throw new Error(`Media file not found: ${filePath}. Make sure the file exists and the path is correct.`);
+                  }
+
+                  const fileBuffer = fs.readFileSync(filePath);
+                  const base64Data = fileBuffer.toString("base64");
+                  const filename = path.basename(filePath);
+                  const ext = path.extname(filePath).toLowerCase().slice(1);
+
+                  // Determine MIME type
+                  const mimeTypes: Record<string, string> = {
+                    jpg: "image/jpeg",
+                    jpeg: "image/jpeg",
+                    png: "image/png",
+                    gif: "image/gif",
+                    webp: "image/webp",
+                    mp4: "video/mp4",
+                    mov: "video/quicktime",
+                    webm: "video/webm",
+                  };
+                  const mimeType = mimeTypes[ext] || "application/octet-stream";
+
+                  return {
+                    data: base64Data,
+                    filename,
+                    mimeType,
+                    type: item.type,
+                  };
+                }
+              })
+            )
+          : undefined;
+
         const result = await bridge.createPost({
           platform: parsed.platform,
           content: parsed.content,
+          media: processedMedia,
         });
 
         // Track post created with content analysis and timing
