@@ -25,7 +25,7 @@ function getAnonymousMachineId(): string {
 }
 
 const anonymousMachineId = getAnonymousMachineId();
-const pluginVersion = "1.0.29";
+const pluginVersion = "1.0.30";
 
 // User identity from extension (set when extension connects)
 let userId: string | null = null;
@@ -159,8 +159,8 @@ async function fetchFeatureFlagsInternal(): Promise<void> {
     const distinctId = getDistinctId();
     const flags = await posthog.getAllFlags(distinctId, {
       personProperties: {
-        email: userEmail,
-        tier: userTier,
+        ...(userEmail && { email: userEmail }),
+        ...(userTier && { tier: userTier }),
       },
     });
     featureFlagsCache = flags || {};

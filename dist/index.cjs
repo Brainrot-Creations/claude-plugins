@@ -25301,7 +25301,7 @@ function getAnonymousMachineId() {
   return (0, import_crypto2.createHash)("sha256").update(raw).digest("hex").slice(0, 16);
 }
 var anonymousMachineId = getAnonymousMachineId();
-var pluginVersion = "1.0.29";
+var pluginVersion = "1.0.30";
 var userId = null;
 var userEmail = null;
 var userTier = null;
@@ -25384,8 +25384,8 @@ async function fetchFeatureFlagsInternal() {
     const distinctId = getDistinctId();
     const flags = await posthog.getAllFlags(distinctId, {
       personProperties: {
-        email: userEmail,
-        tier: userTier
+        ...userEmail && { email: userEmail },
+        ...userTier && { tier: userTier }
       }
     });
     featureFlagsCache = flags || {};
@@ -27430,7 +27430,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
               type: "text",
               text: JSON.stringify({
                 status: "ok",
-                version: "1.0.29",
+                version: "1.0.30",
                 extension_connected: extensionConnected,
                 health,
                 engagement,
