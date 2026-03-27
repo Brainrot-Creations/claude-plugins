@@ -58,7 +58,11 @@ export type ExtensionMessageType =
   | "linkedin_profile_v2"
   | "linkedin_connection_status"
   | "linkedin_engage_v2"
-  | "linkedin_create_post";
+  | "linkedin_create_post"
+  // Extension control
+  | "open_sidebar"
+  | "close_sidebar"
+  | "refresh_auth";
 
 // Payloads for each message type
 export interface GetFeedPostsPayload {

@@ -25301,7 +25301,7 @@ function getAnonymousMachineId() {
   return (0, import_crypto2.createHash)("sha256").update(raw).digest("hex").slice(0, 16);
 }
 var anonymousMachineId = getAnonymousMachineId();
-var pluginVersion = "1.0.30";
+var pluginVersion = "1.0.31";
 var userId = null;
 var userEmail = null;
 var userTier = null;
@@ -25796,6 +25796,8 @@ var BRIDGE_PORT = 9847;
 var BRIDGE_HOST = "127.0.0.1";
 var PING_INTERVAL = 3e4;
 var REQUEST_TIMEOUT = 6e4;
+var MAX_PING_FAILURES = 3;
+var HEALTH_CHECK_TIMEOUT = 5e3;
 function tryReclaimBridgePort(port) {
   if (process.env.SOCIALS_MCP_RECLAIM_PORT !== "1") return;
   try {
@@ -25819,6 +25821,9 @@ var ExtensionBridge = class {
   client = null;
   pendingRequests = /* @__PURE__ */ new Map();
   pingInterval = null;
+  consecutivePingFailures = 0;
+  lastSuccessfulPing = null;
+  lastPingLatencyMs = null;
   async start() {
     return new Promise((resolve, reject) => {
       try {
@@ -25873,12 +25878,34 @@ var ExtensionBridge = class {
     if (this.pingInterval) {
       clearInterval(this.pingInterval);
     }
+    this.consecutivePingFailures = 0;
+    this.lastSuccessfulPing = Date.now();
     this.pingInterval = setInterval(() => {
       if (this.client?.readyState === import_websocket.default.OPEN) {
         const pingStart = Date.now();
         this.sendRequest("ping", void 0).then(() => {
-          recordExtensionLatency(Date.now() - pingStart);
-        }).catch(() => {
+          const latency = Date.now() - pingStart;
+          this.lastPingLatencyMs = latency;
+          this.lastSuccessfulPing = Date.now();
+          this.consecutivePingFailures = 0;
+          recordExtensionLatency(latency);
+        }).catch((error2) => {
+          this.consecutivePingFailures++;
+          console.error(
+            `[ExtensionBridge] Ping failed (${this.consecutivePingFailures}/${MAX_PING_FAILURES}):`,
+            error2.message
+          );
+          if (this.consecutivePingFailures >= MAX_PING_FAILURES) {
+            console.error(
+              `[ExtensionBridge] Connection presumed dead after ${MAX_PING_FAILURES} failed pings. Closing.`
+            );
+            if (this.client) {
+              this.client.close();
+              this.client = null;
+              trackExtensionDisconnected();
+              clearUserIdentity();
+            }
+          }
         });
       }
     }, PING_INTERVAL);
@@ -25926,6 +25953,73 @@ var ExtensionBridge = class {
   /** Whether the MCP process is listening for the browser extension on BRIDGE_PORT. */
   isWsServerListening() {
     return this.wsServerListening;
+  }
+  /**
+   * Get detailed connection health status.
+   * Use this to detect stale connections before long-running operations.
+   */
+  getConnectionHealth() {
+    const now = Date.now();
+    const secondsSinceLastPing = this.lastSuccessfulPing ? Math.round((now - this.lastSuccessfulPing) / 1e3) : null;
+    const maxHealthyAge = PING_INTERVAL * 2.5;
+    const healthy = this.isConnected() && this.consecutivePingFailures === 0 && this.lastSuccessfulPing !== null && now - this.lastSuccessfulPing < maxHealthyAge;
+    return {
+      connected: this.isConnected(),
+      consecutiveFailures: this.consecutivePingFailures,
+      lastSuccessfulPingMs: this.lastSuccessfulPing,
+      lastPingLatencyMs: this.lastPingLatencyMs,
+      secondsSinceLastPing,
+      healthy
+    };
+  }
+  /**
+   * Perform an immediate health check ping.
+   * Returns true if extension responds within HEALTH_CHECK_TIMEOUT.
+   */
+  async healthCheckPing() {
+    if (!this.isConnected()) {
+      return { healthy: false, error: "Not connected" };
+    }
+    const pingStart = Date.now();
+    try {
+      await Promise.race([
+        this.sendRequest("ping", void 0),
+        new Promise(
+          (_, reject) => setTimeout(() => reject(new Error("Health check timeout")), HEALTH_CHECK_TIMEOUT)
+        )
+      ]);
+      const latencyMs = Date.now() - pingStart;
+      this.lastPingLatencyMs = latencyMs;
+      this.lastSuccessfulPing = Date.now();
+      this.consecutivePingFailures = 0;
+      recordExtensionLatency(latencyMs);
+      return { healthy: true, latencyMs };
+    } catch (error2) {
+      this.consecutivePingFailures++;
+      return {
+        healthy: false,
+        error: error2 instanceof Error ? error2.message : "Unknown error"
+      };
+    }
+  }
+  /**
+   * Open the Socials extension sidebar/side panel.
+   */
+  async openSidebar() {
+    return this.sendRequest("open_sidebar", void 0);
+  }
+  /**
+   * Close the Socials extension sidebar/side panel.
+   */
+  async closeSidebar() {
+    return this.sendRequest("close_sidebar", void 0);
+  }
+  /**
+   * Trigger a token refresh / re-authentication in the extension.
+   * This can help recover from expired sessions.
+   */
+  async refreshAuth() {
+    return this.sendRequest("refresh_auth", void 0);
   }
   async checkProAccess() {
     const result = await this.sendRequest("check_pro_access", void 0);
@@ -26707,6 +26801,40 @@ var allTools = [
       },
       required: []
     }
+  },
+  // Connection health and extension control tools
+  {
+    name: "socials_health_check",
+    description: "Check the health of the connection to the Socials extension. Returns ping latency, consecutive failures, and time since last successful ping. Use this to detect if the extension has disconnected mid-session.",
+    inputSchema: {
+      type: "object",
+      properties: {},
+      required: []
+    }
+  },
+  {
+    name: "socials_sidebar",
+    description: "Control the Socials extension sidebar (side panel) in the browser. Use action 'open' to show the sidebar UI, 'close' to hide it.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        action: {
+          type: "string",
+          enum: ["open", "close"],
+          description: "Whether to open or close the sidebar"
+        }
+      },
+      required: ["action"]
+    }
+  },
+  {
+    name: "socials_refresh_auth",
+    description: "Trigger authentication refresh in the Socials extension. Use this when authentication has expired or you need to re-login. Opens the sidebar and triggers token refresh.",
+    inputSchema: {
+      type: "object",
+      properties: {},
+      required: []
+    }
   }
 ];
 server.setRequestHandler(ListToolsRequestSchema, async () => {
@@ -27430,13 +27558,73 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
               type: "text",
               text: JSON.stringify({
                 status: "ok",
-                version: "1.0.30",
+                version: "1.0.31",
                 extension_connected: extensionConnected,
                 health,
                 engagement,
                 feature_gating: featureGating,
                 refreshed: refresh || false
               }, null, 2)
+            }
+          ]
+        };
+      }
+      case "socials_health_check": {
+        const connectionHealth = bridge.getConnectionHealth();
+        const wsListening = bridge.isWsServerListening();
+        await trackToolUsage(name, null, true, getElapsed());
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify({
+                connected: connectionHealth.connected,
+                ws_server_listening: wsListening,
+                consecutive_ping_failures: connectionHealth.consecutiveFailures,
+                seconds_since_last_ping: connectionHealth.secondsSinceLastPing,
+                last_ping_latency_ms: connectionHealth.lastPingLatencyMs,
+                is_healthy: connectionHealth.healthy,
+                message: connectionHealth.healthy ? "Connection is healthy" : connectionHealth.connected ? `Connection may be degraded: ${connectionHealth.consecutiveFailures} consecutive ping failures` : "Extension not connected"
+              })
+            }
+          ]
+        };
+      }
+      case "socials_sidebar": {
+        if (!bridge.isConnected()) {
+          throw new Error("Extension not connected");
+        }
+        const action = args.action;
+        const result = action === "open" ? await bridge.openSidebar() : await bridge.closeSidebar();
+        await trackToolUsage(name, null, result.success, getElapsed());
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify({
+                success: result.success,
+                error: result.error,
+                message: result.success ? `Sidebar ${action === "open" ? "opened" : "closed"}` : result.error || `Failed to ${action} sidebar`
+              })
+            }
+          ]
+        };
+      }
+      case "socials_refresh_auth": {
+        if (!bridge.isConnected()) {
+          throw new Error("Extension not connected");
+        }
+        const result = await bridge.refreshAuth();
+        await trackToolUsage(name, null, result.success, getElapsed());
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify({
+                success: result.success,
+                error: result.error,
+                message: result.success ? "Authentication refresh triggered" : result.error || "Failed to refresh authentication"
+              })
             }
           ]
         };

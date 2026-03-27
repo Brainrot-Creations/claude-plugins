@@ -29,6 +29,8 @@ const BRIDGE_PORT = 9847; // Port for extension to connect to
 const BRIDGE_HOST = "127.0.0.1" as const; // IPv4 only — avoids :: vs localhost mismatch and some EADDRINUSE cases
 const PING_INTERVAL = 30000; // 30 seconds
 const REQUEST_TIMEOUT = 60000; // 60 seconds for generation requests
+const MAX_PING_FAILURES = 3; // Disconnect after 3 consecutive ping failures
+const HEALTH_CHECK_TIMEOUT = 5000; // 5 seconds for health check ping
 
 /** Optional: set SOCIALS_MCP_RECLAIM_PORT=1 to SIGTERM listeners on BRIDGE_PORT before bind (stale Socials MCP server). */
 function tryReclaimBridgePort(port: number): void {
@@ -64,6 +66,9 @@ export class ExtensionBridge {
     }
   >();
   private pingInterval: NodeJS.Timeout | null = null;
+  private consecutivePingFailures = 0;
+  private lastSuccessfulPing: number | null = null;
+  private lastPingLatencyMs: number | null = null;
 
   async start(): Promise<void> {
     return new Promise((resolve, reject) => {
@@ -136,16 +141,42 @@ export class ExtensionBridge {
       clearInterval(this.pingInterval);
     }
 
+    // Reset counters on new connection
+    this.consecutivePingFailures = 0;
+    this.lastSuccessfulPing = Date.now();
+
     this.pingInterval = setInterval(() => {
       if (this.client?.readyState === WebSocket.OPEN) {
         const pingStart = Date.now();
         this.sendRequest("ping", undefined)
           .then(() => {
             // Record latency on successful ping
-            recordExtensionLatency(Date.now() - pingStart);
+            const latency = Date.now() - pingStart;
+            this.lastPingLatencyMs = latency;
+            this.lastSuccessfulPing = Date.now();
+            this.consecutivePingFailures = 0;
+            recordExtensionLatency(latency);
           })
-          .catch(() => {
-            // Ping failed, connection may be dead
+          .catch((error) => {
+            // Ping failed, increment failure counter
+            this.consecutivePingFailures++;
+            console.error(
+              `[ExtensionBridge] Ping failed (${this.consecutivePingFailures}/${MAX_PING_FAILURES}):`,
+              error.message
+            );
+
+            // After MAX_PING_FAILURES consecutive failures, consider connection dead
+            if (this.consecutivePingFailures >= MAX_PING_FAILURES) {
+              console.error(
+                `[ExtensionBridge] Connection presumed dead after ${MAX_PING_FAILURES} failed pings. Closing.`
+              );
+              if (this.client) {
+                this.client.close();
+                this.client = null;
+                trackExtensionDisconnected();
+                clearUserIdentity();
+              }
+            }
           });
       }
     }, PING_INTERVAL);
@@ -203,6 +234,95 @@ export class ExtensionBridge {
   /** Whether the MCP process is listening for the browser extension on BRIDGE_PORT. */
   isWsServerListening(): boolean {
     return this.wsServerListening;
+  }
+
+  /**
+   * Get detailed connection health status.
+   * Use this to detect stale connections before long-running operations.
+   */
+  getConnectionHealth(): {
+    connected: boolean;
+    consecutiveFailures: number;
+    lastSuccessfulPingMs: number | null;
+    lastPingLatencyMs: number | null;
+    secondsSinceLastPing: number | null;
+    healthy: boolean;
+  } {
+    const now = Date.now();
+    const secondsSinceLastPing = this.lastSuccessfulPing
+      ? Math.round((now - this.lastSuccessfulPing) / 1000)
+      : null;
+
+    // Consider healthy if: connected, no recent failures, and pinged within 2 intervals
+    const maxHealthyAge = PING_INTERVAL * 2.5;
+    const healthy =
+      this.isConnected() &&
+      this.consecutivePingFailures === 0 &&
+      this.lastSuccessfulPing !== null &&
+      now - this.lastSuccessfulPing < maxHealthyAge;
+
+    return {
+      connected: this.isConnected(),
+      consecutiveFailures: this.consecutivePingFailures,
+      lastSuccessfulPingMs: this.lastSuccessfulPing,
+      lastPingLatencyMs: this.lastPingLatencyMs,
+      secondsSinceLastPing,
+      healthy,
+    };
+  }
+
+  /**
+   * Perform an immediate health check ping.
+   * Returns true if extension responds within HEALTH_CHECK_TIMEOUT.
+   */
+  async healthCheckPing(): Promise<{ healthy: boolean; latencyMs?: number; error?: string }> {
+    if (!this.isConnected()) {
+      return { healthy: false, error: "Not connected" };
+    }
+
+    const pingStart = Date.now();
+    try {
+      await Promise.race([
+        this.sendRequest("ping", undefined),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error("Health check timeout")), HEALTH_CHECK_TIMEOUT)
+        ),
+      ]);
+      const latencyMs = Date.now() - pingStart;
+      this.lastPingLatencyMs = latencyMs;
+      this.lastSuccessfulPing = Date.now();
+      this.consecutivePingFailures = 0;
+      recordExtensionLatency(latencyMs);
+      return { healthy: true, latencyMs };
+    } catch (error) {
+      this.consecutivePingFailures++;
+      return {
+        healthy: false,
+        error: error instanceof Error ? error.message : "Unknown error",
+      };
+    }
+  }
+
+  /**
+   * Open the Socials extension sidebar/side panel.
+   */
+  async openSidebar(): Promise<{ success: boolean; error?: string }> {
+    return this.sendRequest<{ success: boolean; error?: string }>("open_sidebar", undefined);
+  }
+
+  /**
+   * Close the Socials extension sidebar/side panel.
+   */
+  async closeSidebar(): Promise<{ success: boolean; error?: string }> {
+    return this.sendRequest<{ success: boolean; error?: string }>("close_sidebar", undefined);
+  }
+
+  /**
+   * Trigger a token refresh / re-authentication in the extension.
+   * This can help recover from expired sessions.
+   */
+  async refreshAuth(): Promise<{ success: boolean; error?: string }> {
+    return this.sendRequest<{ success: boolean; error?: string }>("refresh_auth", undefined);
   }
 
   async checkProAccess(): Promise<{ isPro: boolean; tier: string; canUseMcp: boolean }> {

@@ -739,6 +739,48 @@ const allTools = [
           required: [],
         },
       },
+      // Connection health and extension control tools
+      {
+        name: "socials_health_check",
+        description:
+          "Check the health of the connection to the Socials extension. " +
+          "Returns ping latency, consecutive failures, and time since last successful ping. " +
+          "Use this to detect if the extension has disconnected mid-session.",
+        inputSchema: {
+          type: "object",
+          properties: {},
+          required: [],
+        },
+      },
+      {
+        name: "socials_sidebar",
+        description:
+          "Control the Socials extension sidebar (side panel) in the browser. " +
+          "Use action 'open' to show the sidebar UI, 'close' to hide it.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            action: {
+              type: "string",
+              enum: ["open", "close"],
+              description: "Whether to open or close the sidebar",
+            },
+          },
+          required: ["action"],
+        },
+      },
+      {
+        name: "socials_refresh_auth",
+        description:
+          "Trigger authentication refresh in the Socials extension. " +
+          "Use this when authentication has expired or you need to re-login. " +
+          "Opens the sidebar and triggers token refresh.",
+        inputSchema: {
+          type: "object",
+          properties: {},
+          required: [],
+        },
+      },
 ];
 
 // List available tools (filtered by feature flags)
@@ -1628,13 +1670,91 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
               type: "text",
               text: JSON.stringify({
                 status: "ok",
-                version: "1.0.30",
+                version: "1.0.31",
                 extension_connected: extensionConnected,
                 health,
                 engagement,
                 feature_gating: featureGating,
                 refreshed: refresh || false,
               }, null, 2),
+            },
+          ],
+        };
+      }
+
+      case "socials_health_check": {
+        const connectionHealth = bridge.getConnectionHealth();
+        const wsListening = bridge.isWsServerListening();
+        await trackToolUsage(name, null, true, getElapsed());
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify({
+                connected: connectionHealth.connected,
+                ws_server_listening: wsListening,
+                consecutive_ping_failures: connectionHealth.consecutiveFailures,
+                seconds_since_last_ping: connectionHealth.secondsSinceLastPing,
+                last_ping_latency_ms: connectionHealth.lastPingLatencyMs,
+                is_healthy: connectionHealth.healthy,
+                message: connectionHealth.healthy
+                  ? "Connection is healthy"
+                  : connectionHealth.connected
+                    ? `Connection may be degraded: ${connectionHealth.consecutiveFailures} consecutive ping failures`
+                    : "Extension not connected",
+              }),
+            },
+          ],
+        };
+      }
+
+      case "socials_sidebar": {
+        if (!bridge.isConnected()) {
+          throw new Error("Extension not connected");
+        }
+
+        const action = (args as { action: "open" | "close" }).action;
+        const result = action === "open"
+          ? await bridge.openSidebar()
+          : await bridge.closeSidebar();
+        await trackToolUsage(name, null, result.success, getElapsed());
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify({
+                success: result.success,
+                error: result.error,
+                message: result.success
+                  ? `Sidebar ${action === "open" ? "opened" : "closed"}`
+                  : result.error || `Failed to ${action} sidebar`,
+              }),
+            },
+          ],
+        };
+      }
+
+      case "socials_refresh_auth": {
+        if (!bridge.isConnected()) {
+          throw new Error("Extension not connected");
+        }
+
+        const result = await bridge.refreshAuth();
+        await trackToolUsage(name, null, result.success, getElapsed());
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify({
+                success: result.success,
+                error: result.error,
+                message: result.success
+                  ? "Authentication refresh triggered"
+                  : result.error || "Failed to refresh authentication",
+              }),
             },
           ],
         };
