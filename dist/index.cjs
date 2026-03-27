@@ -25301,7 +25301,7 @@ function getAnonymousMachineId() {
   return (0, import_crypto2.createHash)("sha256").update(raw).digest("hex").slice(0, 16);
 }
 var anonymousMachineId = getAnonymousMachineId();
-var pluginVersion = "1.0.33";
+var pluginVersion = "1.0.34";
 var userId = null;
 var userEmail = null;
 var userTier = null;
@@ -26804,7 +26804,7 @@ var allTools = [
   },
   {
     name: "socials_refresh_auth",
-    description: "Restore authentication. If device is registered, uses device-based auth. If user is logged in but device not registered, auto-registers for future sessions. Use when auth fails or session expires.",
+    description: "Restore authentication when connected but auth fails. Uses device-based auth if device was previously registered (works even when logged out). Auto-registers device for future sessions if user is logged in. IMPORTANT: Call this FIRST when any tool fails with auth errors before asking user to log in.",
     inputSchema: {
       type: "object",
       properties: {},
@@ -26896,13 +26896,35 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                   connected: false,
                   ws_server_listening: true,
                   extension_connected: false,
-                  action: "MCP is listening; the browser extension has not connected to ws://127.0.0.1:9847. Use Chrome/Edge/Brave with Socials installed, sign in, open the side panel once so the extension loads (paid plan or allowlisted free tier), then reload the extension if needed. Keep this Claude session open while testing."
+                  action: "Extension not connected to MCP bridge. Ensure: 1) Socials extension is installed in Chrome/Edge/Brave, 2) Extension is enabled in chrome://extensions, 3) Try reloading the extension. Once connected, if auth fails use socials_refresh_auth to restore session."
                 })
               }
             ]
           };
         }
-        const { isPro, tier, canUseMcp, device_registered } = await bridge.checkProAccess();
+        let accessResult;
+        let refreshed = false;
+        try {
+          accessResult = await bridge.checkProAccess();
+        } catch (error2) {
+          const errorMsg = error2 instanceof Error ? error2.message : String(error2);
+          if (errorMsg.toLowerCase().includes("not logged in") || errorMsg.toLowerCase().includes("user not")) {
+            try {
+              const refreshResult = await bridge.refreshAuth();
+              if (refreshResult.success) {
+                refreshed = true;
+                accessResult = await bridge.checkProAccess();
+              } else {
+                throw new Error(refreshResult.error || "Auth refresh failed");
+              }
+            } catch (refreshError) {
+              throw new Error(`Not logged in and auto-refresh failed: ${refreshError instanceof Error ? refreshError.message : refreshError}`);
+            }
+          } else {
+            throw error2;
+          }
+        }
+        const { isPro, tier, canUseMcp, device_registered } = accessResult;
         try {
           const userInfo = await bridge.getCurrentUser();
           setUserIdentity(userInfo.id, userInfo.email, tier);
@@ -26924,7 +26946,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 tier,
                 canUseMcp,
                 device_registered,
-                message: canUseMcp ? isPro ? "Connected with Pro access. Ready to use all Socials tools." : "Connected with MCP access (allowlisted). Ready to use all Socials tools." : `Connected but MCP tools require a paid plan (or allowlist). Current tier: ${tier}. Upgrade at https://socials.brainrotcreations.com/pricing`
+                auto_refreshed: refreshed || void 0,
+                message: canUseMcp ? isPro ? (refreshed ? "Session restored via device auth. " : "") + "Connected with Pro access. Ready to use all Socials tools." : (refreshed ? "Session restored via device auth. " : "") + "Connected with MCP access (allowlisted). Ready to use all Socials tools." : `Connected but MCP tools require a paid plan (or allowlist). Current tier: ${tier}. Upgrade at https://socials.brainrotcreations.com/pricing`
               })
             }
           ]
@@ -27534,7 +27557,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
               type: "text",
               text: JSON.stringify({
                 status: "ok",
-                version: "1.0.33",
+                version: "1.0.34",
                 extension_connected: extensionConnected,
                 health,
                 engagement,
@@ -27605,13 +27628,20 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const errorMessage = error2 instanceof Error ? error2.message : "Unknown error";
     await trackError(name, errorMessage);
     await trackToolUsage(name, platform, false, getElapsed());
+    let hint = "";
+    const lowerError = errorMessage.toLowerCase();
+    if (lowerError.includes("not logged in") || lowerError.includes("auth") || lowerError.includes("session")) {
+      hint = " Try calling socials_refresh_auth to restore the session.";
+    } else if (lowerError.includes("not connected") || lowerError.includes("extension")) {
+      hint = " Ensure the Socials extension is installed and enabled, then call socials_check_access.";
+    }
     return {
       content: [
         {
           type: "text",
           text: JSON.stringify({
             error: true,
-            message: errorMessage
+            message: errorMessage + hint
           })
         }
       ],

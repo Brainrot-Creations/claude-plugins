@@ -25,7 +25,7 @@ function getAnonymousMachineId(): string {
 }
 
 const anonymousMachineId = getAnonymousMachineId();
-const pluginVersion = "1.0.33";
+const pluginVersion = "1.0.34";
 
 // User identity from extension (set when extension connects)
 let userId: string | null = null;
