@@ -451,8 +451,18 @@ export class ExtensionBridge {
     }>("get_page_content", { tabId });
   }
 
-  async quickReply(postId: string, content: string): Promise<{ success: boolean; error?: string }> {
-    return this.sendRequest<{ success: boolean; error?: string }>("quick_reply", { postId, content });
+  async quickReply(
+    postId: string,
+    content: string,
+    media?: Array<{
+      url?: string;
+      data?: string;
+      filename?: string;
+      mimeType?: string;
+      type: "image" | "video" | "gif";
+    }>
+  ): Promise<{ success: boolean; error?: string }> {
+    return this.sendRequest<{ success: boolean; error?: string }>("quick_reply", { postId, content, media });
   }
 
   async createPost(payload: CreatePostPayload): Promise<{ success: boolean; error?: string }> {
