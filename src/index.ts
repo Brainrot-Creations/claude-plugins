@@ -298,7 +298,7 @@ const allTools = [
         name: "socials_quick_reply",
         description:
           "Reply from the pinned agent tab's feed (see socials_open_tab)—that tab need not be focused. " +
-          "Clicks reply on the tweet, types the content, and posts. " +
+          "Clicks reply on the tweet, types the content, optionally attaches media (images, GIFs, videos), and posts. " +
           "You can write the reply yourself OR use socials_generate_reply first if you want to use the user's persona. " +
           "IMPORTANT: Always confirm with the user before posting.",
         inputSchema: {
@@ -311,6 +311,25 @@ const allTools = [
             content: {
               type: "string",
               description: "The reply content (you can write this yourself)",
+            },
+            media: {
+              type: "array",
+              description: "Optional media to attach. Accepts local file paths (e.g., /path/to/image.png) or URLs. Max 4 images or 1 video/GIF.",
+              items: {
+                type: "object",
+                properties: {
+                  path: {
+                    type: "string",
+                    description: "Local file path or URL to the media file",
+                  },
+                  type: {
+                    type: "string",
+                    enum: ["image", "video", "gif"],
+                    description: "Type of media",
+                  },
+                },
+                required: ["path", "type"],
+              },
             },
           },
           required: ["post_id", "content"],
@@ -1049,8 +1068,61 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         await requireProAccess();
         const postId = (args as { post_id: string }).post_id;
         const content = (args as { content: string }).content;
+        const rawMedia = (args as { media?: Array<{ path: string; type: "image" | "video" | "gif" }> }).media;
 
-        const result = await bridge.quickReply(postId, content);
+        // Process media: convert local files to base64, keep URLs as-is (same as create_post)
+        const processedMedia = rawMedia
+          ? await Promise.all(
+              rawMedia.map(async (item) => {
+                // Normalize the path - strip file:// protocol if present
+                let normalizedPath = item.path;
+                if (normalizedPath.startsWith("file://")) {
+                  normalizedPath = normalizedPath.slice(7);
+                }
+
+                const isUrl = normalizedPath.startsWith("http://") || normalizedPath.startsWith("https://");
+
+                if (isUrl) {
+                  return { url: normalizedPath, type: item.type };
+                } else {
+                  // Local file - read and convert to base64
+                  const filePath = normalizedPath.startsWith("~")
+                    ? normalizedPath.replace("~", process.env.HOME || "")
+                    : normalizedPath;
+
+                  if (!fs.existsSync(filePath)) {
+                    throw new Error(`Media file not found: ${filePath}`);
+                  }
+
+                  const fileBuffer = fs.readFileSync(filePath);
+                  const base64Data = fileBuffer.toString("base64");
+                  const filename = path.basename(filePath);
+                  const ext = path.extname(filePath).toLowerCase().slice(1);
+
+                  const mimeTypes: Record<string, string> = {
+                    jpg: "image/jpeg",
+                    jpeg: "image/jpeg",
+                    png: "image/png",
+                    gif: "image/gif",
+                    webp: "image/webp",
+                    mp4: "video/mp4",
+                    mov: "video/quicktime",
+                    webm: "video/webm",
+                  };
+                  const mimeType = mimeTypes[ext] || "application/octet-stream";
+
+                  return {
+                    data: base64Data,
+                    filename,
+                    mimeType,
+                    type: item.type,
+                  };
+                }
+              })
+            )
+          : undefined;
+
+        const result = await bridge.quickReply(postId, content, processedMedia);
 
         // Track reply sent with content analysis and timing
         const elapsed = getElapsed();
