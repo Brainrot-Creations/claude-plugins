@@ -14,10 +14,14 @@
 
 1. Install the [Socials Chrome extension](https://chromewebstore.google.com/detail/socials-generate-posts-in/pmpemhbbmaicdmnlmenopaclpdfnllje)
 
-2. In Claude Code, run:
+2. In Claude Code:
    ```
    /plugin marketplace add Brainrot-Creations/claude-plugins
+   ```
+   ```
    /plugin install socials@brainrot-creations
+   ```
+   ```
    /reload-plugins
    ```
 
