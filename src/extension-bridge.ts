@@ -499,7 +499,7 @@ export class ExtensionBridge {
     }>("engage_post", payload);
   }
 
-  async xSearch(payload: { query: string }): Promise<{
+  async xSearch(payload: { query: string; mode?: string }): Promise<{
     success: boolean;
     url?: string;
     error?: string;

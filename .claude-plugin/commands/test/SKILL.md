@@ -127,7 +127,48 @@ Expected: success=true
 
 ```
 Test: socials_x_search (query: "test")
-Expected: success=true, navigates to search results
+Expected: success=true, navigates to search results (default mode: top)
+```
+
+```
+Test: socials_x_search (query: "startup", mode: "latest")
+Expected: success=true, navigates to Latest tab (f=live)
+```
+
+```
+Test: socials_x_search (query: "AI", from: "elonmusk", min_faves: 100)
+Expected: query="AI from:elonmusk min_faves:100"
+Note: Tests user filter + engagement threshold
+```
+
+```
+Test: socials_x_search (query: "tech", filter: "media", is_retweet: false, lang: "en")
+Expected: query="tech filter:media -is:retweet lang:en"
+Note: Tests content filter + exclusion + language
+```
+
+```
+Test: socials_x_search (query: "news", since: "2026-01-01", until: "2026-03-01")
+Expected: query="news since:2026-01-01 until:2026-03-01"
+Note: Tests date range (YYYY-MM-DD format)
+```
+
+```
+Test: socials_x_search (query: "#buildinpublic", has: ["media", "links"], min_retweets: 5)
+Expected: query="#buildinpublic has:media has:links min_retweets:5"
+Note: Tests hashtag + has filters + engagement
+```
+
+```
+Test: socials_x_search (query: "conference", near: "San Francisco", place_country: "US")
+Expected: query="conference near:\"San Francisco\" place_country:US"
+Note: Tests location filters
+```
+
+```
+Test: socials_x_search (query: "thread", is_reply: false, mode: "latest")
+Expected: query="thread -is:reply", mode=latest
+Note: Tests reply exclusion for finding original posts
 ```
 
 After search results load, test post context:
@@ -432,6 +473,14 @@ Total: XX/XX tests passed
 
 9. **Modal targeting**: Posts/replies correctly target the modal compose box (not timeline composer)
 
+10. **X Advanced Search**: Test all modes (top/latest/people/photos/videos) and operators:
+    - User: from, to, retweets_of
+    - Time: since/until (YYYY-MM-DD), since_time/until_time (Unix)
+    - Engagement: min_faves, min_retweets, min_replies
+    - Content: filter (media/images/video/links), has[], is_reply, is_retweet
+    - Location: lang, near, place, place_country
+    - Advanced: list, conversation_id
+
 ---
 
 ## Optional Parameters
@@ -472,7 +521,14 @@ Running in DRY RUN mode (safe, non-destructive)
   socials_get_feed: PASS (5 posts retrieved)
   socials_get_page_content: PASS (5 posts)
   socials_scroll: PASS
-  socials_x_search: PASS (navigated to search)
+  socials_x_search (basic): PASS (mode: top)
+  socials_x_search (mode: latest): PASS (f=live)
+  socials_x_search (from + min_faves): PASS (user + engagement)
+  socials_x_search (filter + is_retweet + lang): PASS (content filters)
+  socials_x_search (since/until): PASS (date range)
+  socials_x_search (hashtag + has + min_retweets): PASS (has filters)
+  socials_x_search (near + place_country): PASS (location)
+  socials_x_search (is_reply: false): PASS (exclusion)
   socials_get_post_context: PASS (context retrieved)
 
 [4/9] X (Twitter) Destructive Tests

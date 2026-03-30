@@ -126,8 +126,39 @@ const XSearchSchema = z.object({
     .string()
     .min(1)
     .describe(
-      'X search text (e.g. "startup", hashtag, or from:user). Submits the top search field and navigates to results.',
+      'Base search text. Can include hashtags (#), mentions (@), cashtags ($), exact phrases ("phrase"), or exclusions (-word).',
     ),
+  // User filters
+  from: z.string().optional().describe("Posts from specific user (without @)"),
+  to: z.string().optional().describe("Replies to specific user (without @)"),
+  retweets_of: z.string().optional().describe("Retweets of specific user's posts"),
+  // Time filters
+  since: z.string().optional().describe("Start date (YYYY-MM-DD)"),
+  until: z.string().optional().describe("End date (YYYY-MM-DD)"),
+  since_time: z.number().optional().describe("Start Unix timestamp"),
+  until_time: z.number().optional().describe("End Unix timestamp"),
+  // Engagement filters
+  min_retweets: z.number().optional().describe("Minimum retweet count"),
+  min_faves: z.number().optional().describe("Minimum like count"),
+  min_replies: z.number().optional().describe("Minimum reply count"),
+  // Content filters
+  filter: z.enum(["media", "images", "video", "links"]).optional()
+    .describe("Include only posts with specific content type"),
+  has: z.array(z.enum(["links", "hashtags", "media", "images", "video"])).optional()
+    .describe("Must have these content types"),
+  is_reply: z.boolean().optional().describe("Only show replies (true) or exclude replies (false)"),
+  is_retweet: z.boolean().optional().describe("Only show retweets (true) or exclude retweets (false)"),
+  // Location filters
+  lang: z.string().optional().describe("Language code (e.g., 'en', 'es', 'ja')"),
+  near: z.string().optional().describe("Location name (e.g., 'San Francisco')"),
+  place: z.string().optional().describe("Specific place ID"),
+  place_country: z.string().optional().describe("Country code (e.g., 'US', 'GB')"),
+  // Advanced
+  list: z.string().optional().describe("Posts from members of a list (list ID)"),
+  conversation_id: z.string().optional().describe("Posts in a specific conversation thread"),
+  // Results mode
+  mode: z.enum(["top", "latest", "people", "photos", "videos"]).optional()
+    .describe("Search results tab (default: top)"),
 });
 
 const LinkedInPostsSearchSchema = z.object({
@@ -413,15 +444,51 @@ const allTools = [
       {
         name: "socials_x_search",
         description:
-          "On X, run search in the pinned agent tab (not necessarily the focused tab): fills top search and navigates to results (e.g. /search?q=…). " +
-          "After success, use socials_get_feed, socials_quick_reply, and socials_engage_post on the visible tweets. " +
-          "If the search box is missing, the extension may navigate the agent tab to https://x.com/explore and retry once.",
+          "Advanced X search with full operator support. " +
+          "User: from/to/retweets_of. Time: since/until (YYYY-MM-DD) or since_time/until_time (Unix). " +
+          "Engagement: min_faves/min_retweets/min_replies. Content: filter (media/images/video/links), " +
+          "has (links/hashtags/media), is_reply, is_retweet. Location: lang, near, place_country. " +
+          "Modes: top (default), latest, people, photos, videos. " +
+          "Query supports: #hashtags, @mentions, $cashtags, \"exact phrases\", -exclusions.",
         inputSchema: {
           type: "object",
           properties: {
             query: {
               type: "string",
-              description: "Search string to submit in X's top search box",
+              description: "Search text with optional #hashtags, @mentions, $cashtags, \"phrases\", -exclusions",
+            },
+            from: { type: "string", description: "Posts from user (without @)" },
+            to: { type: "string", description: "Replies to user (without @)" },
+            retweets_of: { type: "string", description: "Retweets of user's posts" },
+            since: { type: "string", description: "Start date (YYYY-MM-DD)" },
+            until: { type: "string", description: "End date (YYYY-MM-DD)" },
+            since_time: { type: "number", description: "Start Unix timestamp" },
+            until_time: { type: "number", description: "End Unix timestamp" },
+            min_retweets: { type: "number", description: "Minimum retweets" },
+            min_faves: { type: "number", description: "Minimum likes" },
+            min_replies: { type: "number", description: "Minimum replies" },
+            filter: {
+              type: "string",
+              enum: ["media", "images", "video", "links"],
+              description: "Only posts with this content type",
+            },
+            has: {
+              type: "array",
+              items: { type: "string", enum: ["links", "hashtags", "media", "images", "video"] },
+              description: "Must have these content types",
+            },
+            is_reply: { type: "boolean", description: "true=only replies, false=exclude replies" },
+            is_retweet: { type: "boolean", description: "true=only retweets, false=exclude retweets" },
+            lang: { type: "string", description: "Language code (en, es, ja, etc.)" },
+            near: { type: "string", description: "Location name" },
+            place: { type: "string", description: "Specific place ID" },
+            place_country: { type: "string", description: "Country code (US, GB, etc.)" },
+            list: { type: "string", description: "Posts from list members (list ID)" },
+            conversation_id: { type: "string", description: "Posts in conversation thread" },
+            mode: {
+              type: "string",
+              enum: ["top", "latest", "people", "photos", "videos"],
+              description: "Results tab (default: top)",
             },
           },
           required: ["query"],
@@ -1280,7 +1347,50 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case "socials_x_search": {
         await requireProAccess();
         const parsed = XSearchSchema.parse(args);
-        const result = await bridge.xSearch({ query: parsed.query });
+
+        // Build advanced query string from parameters
+        const queryParts: string[] = [parsed.query];
+
+        // User filters
+        if (parsed.from) queryParts.push(`from:${parsed.from}`);
+        if (parsed.to) queryParts.push(`to:${parsed.to}`);
+        if (parsed.retweets_of) queryParts.push(`retweets_of:${parsed.retweets_of}`);
+
+        // Time filters
+        if (parsed.since) queryParts.push(`since:${parsed.since}`);
+        if (parsed.until) queryParts.push(`until:${parsed.until}`);
+        if (parsed.since_time) queryParts.push(`since_time:${parsed.since_time}`);
+        if (parsed.until_time) queryParts.push(`until_time:${parsed.until_time}`);
+
+        // Engagement filters
+        if (parsed.min_retweets) queryParts.push(`min_retweets:${parsed.min_retweets}`);
+        if (parsed.min_faves) queryParts.push(`min_faves:${parsed.min_faves}`);
+        if (parsed.min_replies) queryParts.push(`min_replies:${parsed.min_replies}`);
+
+        // Content filters
+        if (parsed.filter) queryParts.push(`filter:${parsed.filter}`);
+        if (parsed.has) {
+          for (const h of parsed.has) {
+            queryParts.push(`has:${h}`);
+          }
+        }
+        if (parsed.is_reply === true) queryParts.push(`is:reply`);
+        if (parsed.is_reply === false) queryParts.push(`-is:reply`);
+        if (parsed.is_retweet === true) queryParts.push(`is:retweet`);
+        if (parsed.is_retweet === false) queryParts.push(`-is:retweet`);
+
+        // Location filters
+        if (parsed.lang) queryParts.push(`lang:${parsed.lang}`);
+        if (parsed.near) queryParts.push(`near:"${parsed.near}"`);
+        if (parsed.place) queryParts.push(`place:${parsed.place}`);
+        if (parsed.place_country) queryParts.push(`place_country:${parsed.place_country}`);
+
+        // Advanced filters
+        if (parsed.list) queryParts.push(`list:${parsed.list}`);
+        if (parsed.conversation_id) queryParts.push(`conversation_id:${parsed.conversation_id}`);
+
+        const fullQuery = queryParts.join(" ");
+        const result = await bridge.xSearch({ query: fullQuery, mode: parsed.mode });
 
         // Track search with timing
         const elapsed = getElapsed();
@@ -1294,6 +1404,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
               text: JSON.stringify({
                 success: result.success,
                 url: result.url,
+                query: fullQuery,
                 error: result.error,
               }),
             },
