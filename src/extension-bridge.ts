@@ -483,6 +483,20 @@ export class ExtensionBridge {
     return this.sendRequest<{ success: boolean; error?: string }>("quick_reply", { postId, content, media });
   }
 
+  async quoteTweet(
+    postId: string,
+    content: string,
+    media?: Array<{
+      url?: string;
+      data?: string;
+      filename?: string;
+      mimeType?: string;
+      type: "image" | "video" | "gif";
+    }>
+  ): Promise<{ success: boolean; error?: string }> {
+    return this.sendRequest<{ success: boolean; error?: string }>("quote_tweet", { postId, content, media });
+  }
+
   async createPost(payload: CreatePostPayload): Promise<{ success: boolean; error?: string }> {
     return this.sendRequest<{ success: boolean; error?: string }>("create_post", payload);
   }

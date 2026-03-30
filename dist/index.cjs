@@ -26116,6 +26116,9 @@ var ExtensionBridge = class {
   async quickReply(postId, content, media) {
     return this.sendRequest("quick_reply", { postId, content, media });
   }
+  async quoteTweet(postId, content, media) {
+    return this.sendRequest("quote_tweet", { postId, content, media });
+  }
   async createPost(payload) {
     return this.sendRequest("create_post", payload);
   }
@@ -26660,6 +26663,43 @@ var allTools = [
         }
       },
       required: []
+    }
+  },
+  {
+    name: "socials_x_quote_tweet",
+    description: "Quote tweet a post on X. Opens the quote compose dialog, types the content, optionally attaches media, and posts. IMPORTANT: Always confirm with the user before posting.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        post_id: {
+          type: "string",
+          description: "Tweet/post ID to quote (from socials_get_feed)"
+        },
+        content: {
+          type: "string",
+          description: "Your quote tweet content"
+        },
+        media: {
+          type: "array",
+          description: "Optional media to attach. Accepts local file paths or URLs. Max 4 images or 1 video/GIF.",
+          items: {
+            type: "object",
+            properties: {
+              path: {
+                type: "string",
+                description: "Local file path or URL to the media file"
+              },
+              type: {
+                type: "string",
+                enum: ["image", "video", "gif"],
+                description: "Type of media"
+              }
+            },
+            required: ["path", "type"]
+          }
+        }
+      },
+      required: ["post_id", "content"]
     }
   },
   {
@@ -27452,6 +27492,64 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           ]
         };
       }
+      case "socials_x_quote_tweet": {
+        await requireProAccess();
+        const postId = args.post_id;
+        const content = args.content;
+        const rawMedia = args.media;
+        const processedMedia = rawMedia ? await Promise.all(
+          rawMedia.map(async (item) => {
+            let normalizedPath = item.path;
+            if (normalizedPath.startsWith("file://")) {
+              normalizedPath = normalizedPath.slice(7);
+            }
+            const isUrl = normalizedPath.startsWith("http://") || normalizedPath.startsWith("https://");
+            if (isUrl) {
+              return { url: normalizedPath, type: item.type };
+            } else {
+              const filePath = normalizedPath.startsWith("~") ? normalizedPath.replace("~", process.env.HOME || "") : normalizedPath;
+              if (!fs.existsSync(filePath)) {
+                throw new Error(`Media file not found: ${filePath}`);
+              }
+              const fileBuffer = fs.readFileSync(filePath);
+              const base64Data = fileBuffer.toString("base64");
+              const filename = path.basename(filePath);
+              const ext = path.extname(filePath).toLowerCase().slice(1);
+              const mimeTypes = {
+                jpg: "image/jpeg",
+                jpeg: "image/jpeg",
+                png: "image/png",
+                gif: "image/gif",
+                webp: "image/webp",
+                mp4: "video/mp4",
+                mov: "video/quicktime",
+                webm: "video/webm"
+              };
+              const mimeType = mimeTypes[ext] || "application/octet-stream";
+              return {
+                data: base64Data,
+                filename,
+                mimeType,
+                type: item.type
+              };
+            }
+          })
+        ) : void 0;
+        const result = await bridge.quoteTweet(postId, content, processedMedia);
+        const elapsed = getElapsed();
+        await trackToolUsage(name, "x", result.success, elapsed);
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify({
+                success: result.success,
+                error: result.error
+              })
+            }
+          ]
+        };
+      }
       case "socials_list_personas": {
         if (!bridge.isConnected()) {
           throw new Error("Extension not connected");
@@ -27854,7 +27952,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
               type: "text",
               text: JSON.stringify({
                 status: "ok",
-                version: "1.0.34",
+                version: "1.0.43",
                 extension_connected: extensionConnected,
                 health,
                 engagement,

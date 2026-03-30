@@ -36,9 +36,12 @@ export type ExtensionMessageType =
   | "close_tab"
   | "get_page_content"
   | "quick_reply"
+  | "quote_tweet"
   | "create_post"
   | "engage_post"
   | "x_search"
+  | "x_profile"
+  | "x_notifications"
   | "scroll_page"
   // LinkedIn People Search
   | "linkedin_people_search"
