@@ -25830,7 +25830,10 @@ var HEALTH_CHECK_TIMEOUT = 5e3;
 var portConfig = { portStart: DEFAULT_PORT_START, portCount: DEFAULT_PORT_COUNT };
 async function initPortConfig() {
   try {
-    portConfig = await getPortConfig();
+    const timeoutPromise = new Promise(
+      (_, reject) => setTimeout(() => reject(new Error("Timeout")), 5e3)
+    );
+    portConfig = await Promise.race([getPortConfig(), timeoutPromise]);
     console.log(`[ExtensionBridge] Port config: ${portConfig.portStart}-${portConfig.portStart + portConfig.portCount - 1} (${portConfig.portCount} ports)`);
   } catch {
     console.log(`[ExtensionBridge] Using default port config: ${DEFAULT_PORT_START}-${DEFAULT_PORT_START + DEFAULT_PORT_COUNT - 1}`);
@@ -25892,8 +25895,9 @@ var ExtensionBridge = class {
         });
         this.wss.on("listening", () => {
           this.wsServerListening = true;
+          const portEnd = portConfig.portStart + portConfig.portCount - 1;
           console.error(
-            `[ExtensionBridge] WebSocket server listening on ${BRIDGE_HOST}:${port} (extension scans ports ${BRIDGE_PORT_START}-${BRIDGE_PORT_END})`
+            `[ExtensionBridge] WebSocket server listening on ${BRIDGE_HOST}:${port} (extension scans ports ${portConfig.portStart}-${portEnd})`
           );
           resolve();
         });

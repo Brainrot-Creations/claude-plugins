@@ -37,10 +37,14 @@ const HEALTH_CHECK_TIMEOUT = 5000; // 5 seconds for health check ping
 // Runtime port config (populated from feature flags at startup)
 let portConfig: PortConfig = { portStart: DEFAULT_PORT_START, portCount: DEFAULT_PORT_COUNT };
 
-/** Initialize port config from feature flags */
+/** Initialize port config from feature flags (with 5s timeout) */
 export async function initPortConfig(): Promise<PortConfig> {
   try {
-    portConfig = await getPortConfig();
+    // Add timeout to prevent hanging on slow PostHog fetch
+    const timeoutPromise = new Promise<PortConfig>((_, reject) =>
+      setTimeout(() => reject(new Error("Timeout")), 5000)
+    );
+    portConfig = await Promise.race([getPortConfig(), timeoutPromise]);
     console.log(`[ExtensionBridge] Port config: ${portConfig.portStart}-${portConfig.portStart + portConfig.portCount - 1} (${portConfig.portCount} ports)`);
   } catch {
     console.log(`[ExtensionBridge] Using default port config: ${DEFAULT_PORT_START}-${DEFAULT_PORT_START + DEFAULT_PORT_COUNT - 1}`);
@@ -125,8 +129,9 @@ export class ExtensionBridge {
 
         this.wss.on("listening", () => {
           this.wsServerListening = true;
+          const portEnd = portConfig.portStart + portConfig.portCount - 1;
           console.error(
-            `[ExtensionBridge] WebSocket server listening on ${BRIDGE_HOST}:${port} (extension scans ports ${BRIDGE_PORT_START}-${BRIDGE_PORT_END})`
+            `[ExtensionBridge] WebSocket server listening on ${BRIDGE_HOST}:${port} (extension scans ports ${portConfig.portStart}-${portEnd})`
           );
           resolve();
         });
