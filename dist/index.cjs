@@ -25444,6 +25444,34 @@ var PlatformFlags = {
   linkedin: "mcp_platform_linkedin",
   reddit: "mcp_platform_reddit"
 };
+var PORT_CONFIG_FLAG = "mcp_port_config";
+var DEFAULT_PORT_CONFIG = {
+  portStart: 9847,
+  portCount: 10
+};
+async function getPortConfig() {
+  if (!featureFlagsFetchedAt || Date.now() - featureFlagsFetchedAt > FEATURE_FLAGS_TTL) {
+    await fetchFeatureFlags();
+  }
+  const payload = featureFlagsCache[PORT_CONFIG_FLAG];
+  if (!payload || typeof payload !== "object") {
+    return DEFAULT_PORT_CONFIG;
+  }
+  let config2;
+  if (typeof payload === "string") {
+    try {
+      config2 = JSON.parse(payload);
+    } catch {
+      return DEFAULT_PORT_CONFIG;
+    }
+  } else {
+    config2 = payload;
+  }
+  return {
+    portStart: typeof config2.portStart === "number" ? config2.portStart : DEFAULT_PORT_CONFIG.portStart,
+    portCount: typeof config2.portCount === "number" ? config2.portCount : DEFAULT_PORT_CONFIG.portCount
+  };
+}
 var ToolFlags = {
   socials_check_access: "mcp_tool_check_access",
   socials_diagnostics: "mcp_tool_diagnostics",
@@ -25792,32 +25820,60 @@ function updateTierGroupProperties() {
 }
 
 // src/extension-bridge.ts
-var BRIDGE_PORT = 9847;
+var DEFAULT_PORT_START = 9847;
+var DEFAULT_PORT_COUNT = 10;
 var BRIDGE_HOST = "127.0.0.1";
 var PING_INTERVAL = 3e4;
 var REQUEST_TIMEOUT = 6e4;
 var MAX_PING_FAILURES = 3;
 var HEALTH_CHECK_TIMEOUT = 5e3;
-function tryReclaimBridgePort(port) {
-  if (process.env.SOCIALS_MCP_RECLAIM_PORT !== "1") return;
+var portConfig = { portStart: DEFAULT_PORT_START, portCount: DEFAULT_PORT_COUNT };
+async function initPortConfig() {
   try {
-    const out = (0, import_child_process.execFileSync)("lsof", ["-t", "-i", `TCP:${port}`], {
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "ignore"]
-    }).trim();
-    for (const pid of out.split("\n").filter(Boolean)) {
-      try {
-        process.kill(Number(pid), "SIGTERM");
-      } catch {
-      }
-    }
+    portConfig = await getPortConfig();
+    console.log(`[ExtensionBridge] Port config: ${portConfig.portStart}-${portConfig.portStart + portConfig.portCount - 1} (${portConfig.portCount} ports)`);
   } catch {
+    console.log(`[ExtensionBridge] Using default port config: ${DEFAULT_PORT_START}-${DEFAULT_PORT_START + DEFAULT_PORT_COUNT - 1}`);
   }
+  return portConfig;
+}
+function getCurrentPortConfig() {
+  return portConfig;
+}
+function isPortAvailable(port) {
+  return new Promise((resolve) => {
+    const net = require("net");
+    const server2 = net.createServer();
+    server2.once("error", () => resolve(false));
+    server2.once("listening", () => {
+      server2.close();
+      resolve(true);
+    });
+    server2.listen(port, BRIDGE_HOST);
+  });
+}
+async function findAvailablePort() {
+  const envPort = process.env.SOCIALS_MCP_PORT;
+  if (envPort) {
+    const port = parseInt(envPort, 10);
+    if (!isNaN(port) && port > 0 && port < 65536) {
+      return port;
+    }
+  }
+  const portEnd = portConfig.portStart + portConfig.portCount - 1;
+  for (let port = portConfig.portStart; port <= portEnd; port++) {
+    if (await isPortAvailable(port)) {
+      return port;
+    }
+  }
+  throw new Error(`No available ports in range ${portConfig.portStart}-${portEnd}. Close some MCP instances.`);
 }
 var ExtensionBridge = class {
   wss = null;
-  /** True after the WebSocket server has bound to BRIDGE_PORT (extension can dial in). */
+  /** True after the WebSocket server has bound to a port (extension can dial in). */
   wsServerListening = false;
+  /** The port we're actually listening on */
+  activePort = 0;
   client = null;
   pendingRequests = /* @__PURE__ */ new Map();
   pingInterval = null;
@@ -25825,18 +25881,19 @@ var ExtensionBridge = class {
   lastSuccessfulPing = null;
   lastPingLatencyMs = null;
   async start() {
+    const port = await findAvailablePort();
+    this.activePort = port;
     return new Promise((resolve, reject) => {
       try {
         this.wsServerListening = false;
-        tryReclaimBridgePort(BRIDGE_PORT);
         this.wss = new import_websocket_server.default({
-          port: BRIDGE_PORT,
+          port,
           host: BRIDGE_HOST
         });
         this.wss.on("listening", () => {
           this.wsServerListening = true;
           console.error(
-            `[ExtensionBridge] WebSocket server listening on ${BRIDGE_HOST}:${BRIDGE_PORT} (extension must use ws://127.0.0.1:${BRIDGE_PORT})`
+            `[ExtensionBridge] WebSocket server listening on ${BRIDGE_HOST}:${port} (extension scans ports ${BRIDGE_PORT_START}-${BRIDGE_PORT_END})`
           );
           resolve();
         });
@@ -25865,7 +25922,7 @@ var ExtensionBridge = class {
         });
         this.wss.on("error", (error2) => {
           this.wsServerListening = false;
-          const hint = error2.code === "EADDRINUSE" ? ` Port ${BRIDGE_PORT} is in use. Quit duplicate Claude/MCP instances, or run: lsof -nP -iTCP:${BRIDGE_PORT} | grep LISTEN \u2014 then kill that PID. Or set SOCIALS_MCP_RECLAIM_PORT=1 in MCP env to reclaim the port (use with care).` : "";
+          const hint = error2.code === "EADDRINUSE" ? ` Port ${port} is in use (should not happen with auto-discovery). Try setting SOCIALS_MCP_PORT env var to a specific port.` : "";
           console.error("[ExtensionBridge] Server error:", error2.message + hint);
           reject(error2);
         });
@@ -26244,36 +26301,39 @@ var ExtensionBridge = class {
     }
   }
   /**
-   * Restart the WebSocket bridge. Useful when the connection is stuck or port is in use.
-   * Force-kills any process on BRIDGE_PORT before restarting.
+   * Restart the WebSocket bridge. Useful when the connection is stuck.
+   * Will find a new available port automatically.
    */
   async restart() {
     console.error("[ExtensionBridge] Restarting bridge...");
+    const oldPort = this.activePort;
     this.stop();
     await new Promise((resolve) => setTimeout(resolve, 500));
-    try {
-      const out = (0, import_child_process.execFileSync)("lsof", ["-t", "-i", `TCP:${BRIDGE_PORT}`], {
-        encoding: "utf8",
-        stdio: ["ignore", "pipe", "ignore"]
-      }).trim();
-      for (const pid of out.split("\n").filter(Boolean)) {
-        const pidNum = Number(pid);
-        if (pidNum !== process.pid) {
-          try {
-            process.kill(pidNum, "SIGTERM");
-            console.error(`[ExtensionBridge] Killed stale process ${pidNum} on port ${BRIDGE_PORT}`);
-          } catch {
+    if (oldPort > 0) {
+      try {
+        const out = (0, import_child_process.execFileSync)("lsof", ["-t", "-i", `TCP:${oldPort}`], {
+          encoding: "utf8",
+          stdio: ["ignore", "pipe", "ignore"]
+        }).trim();
+        for (const pid of out.split("\n").filter(Boolean)) {
+          const pidNum = Number(pid);
+          if (pidNum !== process.pid) {
+            try {
+              process.kill(pidNum, "SIGTERM");
+              console.error(`[ExtensionBridge] Killed stale process ${pidNum} on port ${oldPort}`);
+            } catch {
+            }
           }
         }
+        await new Promise((resolve) => setTimeout(resolve, 500));
+      } catch {
       }
-      await new Promise((resolve) => setTimeout(resolve, 500));
-    } catch {
     }
     try {
       await this.start();
       return {
         success: true,
-        message: `Bridge restarted successfully. WebSocket server listening on ${BRIDGE_HOST}:${BRIDGE_PORT}. Please refresh the Socials extension in your browser to reconnect.`
+        message: `Bridge restarted successfully. WebSocket server listening on ${BRIDGE_HOST}:${this.activePort}. Extension will auto-discover this port.`
       };
     } catch (error2) {
       const msg = error2 instanceof Error ? error2.message : "Unknown error";
@@ -26282,6 +26342,10 @@ var ExtensionBridge = class {
         message: `Failed to restart bridge: ${msg}`
       };
     }
+  }
+  /** Get the port this bridge is listening on */
+  getActivePort() {
+    return this.activePort;
   }
 };
 
@@ -27952,7 +28016,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
               type: "text",
               text: JSON.stringify({
                 status: "ok",
-                version: "1.1.3",
+                version: "1.1.4",
                 extension_connected: extensionConnected,
                 health,
                 engagement,
@@ -28058,6 +28122,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 });
 async function main() {
   trackServerStart();
+  await initPortConfig();
   try {
     await bridge.start();
     console.error("[socials-plugin] Extension bridge started");
@@ -28065,8 +28130,10 @@ async function main() {
     const msg = error2 instanceof Error ? error2.message : String(error2);
     console.error("[socials-plugin] Failed to start extension bridge:", msg);
     if (msg.includes("EADDRINUSE") || msg.includes("address already in use")) {
+      const config2 = getCurrentPortConfig();
+      const portEnd = config2.portStart + config2.portCount - 1;
       console.error(
-        "[socials-plugin] Another process holds port 9847 (often a stale Socials MCP process). Fix: quit duplicate Claude windows, or run `lsof -nP -iTCP:9847 | grep LISTEN` and kill that PID. Optional: set env SOCIALS_MCP_RECLAIM_PORT=1 on this MCP server to SIGTERM listeners on 9847 before bind."
+        `[socials-plugin] All ports ${config2.portStart}-${portEnd} are in use (often stale Socials MCP processes). Fix: quit duplicate Claude windows, or run \`lsof -nP -iTCP:${config2.portStart} | grep LISTEN\` and kill that PID. Optional: set env SOCIALS_MCP_RECLAIM_PORT=1 on this MCP server to SIGTERM listeners before bind.`
       );
     }
   }

@@ -284,6 +284,80 @@ export const PlatformFlags = {
   reddit: "mcp_platform_reddit",
 } as const;
 
+// ============ Port Configuration Feature Flag ============
+
+export const PORT_CONFIG_FLAG = "mcp_port_config";
+
+export interface PortConfig {
+  portStart: number;
+  portCount: number;
+}
+
+const DEFAULT_PORT_CONFIG: PortConfig = {
+  portStart: 9847,
+  portCount: 10,
+};
+
+/**
+ * Get port configuration from feature flags.
+ * Returns cached value if available, otherwise fetches from PostHog.
+ */
+export async function getPortConfig(): Promise<PortConfig> {
+  // Ensure flags are loaded
+  if (!featureFlagsFetchedAt || Date.now() - featureFlagsFetchedAt > FEATURE_FLAGS_TTL) {
+    await fetchFeatureFlags();
+  }
+
+  const payload = featureFlagsCache[PORT_CONFIG_FLAG];
+  if (!payload || typeof payload !== "object") {
+    return DEFAULT_PORT_CONFIG;
+  }
+
+  // Parse payload - it could be a string (JSON) or already parsed object
+  let config: Record<string, unknown>;
+  if (typeof payload === "string") {
+    try {
+      config = JSON.parse(payload);
+    } catch {
+      return DEFAULT_PORT_CONFIG;
+    }
+  } else {
+    config = payload as Record<string, unknown>;
+  }
+
+  return {
+    portStart: typeof config.portStart === "number" ? config.portStart : DEFAULT_PORT_CONFIG.portStart,
+    portCount: typeof config.portCount === "number" ? config.portCount : DEFAULT_PORT_CONFIG.portCount,
+  };
+}
+
+/**
+ * Get port configuration synchronously (uses cached value).
+ * May return defaults if flags haven't been fetched yet.
+ */
+export function getPortConfigSync(): PortConfig {
+  const payload = featureFlagsCache[PORT_CONFIG_FLAG];
+  if (!payload || typeof payload !== "object") {
+    return DEFAULT_PORT_CONFIG;
+  }
+
+  let config: Record<string, unknown>;
+  if (typeof payload === "string") {
+    try {
+      config = JSON.parse(payload);
+    } catch {
+      return DEFAULT_PORT_CONFIG;
+    }
+  } else {
+    config = payload as Record<string, unknown>;
+  }
+
+  return {
+    portStart: typeof config.portStart === "number" ? config.portStart : DEFAULT_PORT_CONFIG.portStart,
+    portCount: typeof config.portCount === "number" ? config.portCount : DEFAULT_PORT_CONFIG.portCount,
+  };
+}
+
 export const ToolFlags: Record<string, string> = {
   socials_check_access: "mcp_tool_check_access",
   socials_diagnostics: "mcp_tool_diagnostics",

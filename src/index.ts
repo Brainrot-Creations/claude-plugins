@@ -9,7 +9,7 @@ import {
 import { z } from "zod";
 import * as fs from "fs";
 import * as path from "path";
-import { ExtensionBridge } from "./extension-bridge.js";
+import { ExtensionBridge, initPortConfig, getCurrentPortConfig } from "./extension-bridge.js";
 import {
   trackServerStart,
   trackToolUsage,
@@ -2094,7 +2094,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
               type: "text",
               text: JSON.stringify({
                 status: "ok",
-                version: "1.1.3",
+                version: "1.1.4",
                 extension_connected: extensionConnected,
                 health,
                 engagement,
@@ -2223,6 +2223,9 @@ async function main(): Promise<void> {
   // Track server start
   trackServerStart();
 
+  // Initialize port config from feature flags before starting bridge
+  await initPortConfig();
+
   // Start WebSocket bridge for extension communication
   try {
     await bridge.start();
@@ -2231,10 +2234,12 @@ async function main(): Promise<void> {
     const msg = error instanceof Error ? error.message : String(error);
     console.error("[socials-plugin] Failed to start extension bridge:", msg);
     if (msg.includes("EADDRINUSE") || msg.includes("address already in use")) {
+      const config = getCurrentPortConfig();
+      const portEnd = config.portStart + config.portCount - 1;
       console.error(
-        "[socials-plugin] Another process holds port 9847 (often a stale Socials MCP process). " +
-          "Fix: quit duplicate Claude windows, or run `lsof -nP -iTCP:9847 | grep LISTEN` and kill that PID. " +
-          "Optional: set env SOCIALS_MCP_RECLAIM_PORT=1 on this MCP server to SIGTERM listeners on 9847 before bind.",
+        `[socials-plugin] All ports ${config.portStart}-${portEnd} are in use (often stale Socials MCP processes). ` +
+          `Fix: quit duplicate Claude windows, or run \`lsof -nP -iTCP:${config.portStart} | grep LISTEN\` and kill that PID. ` +
+          "Optional: set env SOCIALS_MCP_RECLAIM_PORT=1 on this MCP server to SIGTERM listeners before bind.",
       );
     }
     // Continue anyway - tools will report extension not connected

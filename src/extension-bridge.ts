@@ -1,7 +1,7 @@
 import { execFileSync } from "child_process";
 import { WebSocketServer, WebSocket } from "ws";
 import { randomUUID } from "crypto";
-import { trackExtensionDisconnected, clearUserIdentity, recordExtensionLatency } from "./analytics.js";
+import { trackExtensionDisconnected, clearUserIdentity, recordExtensionLatency, getPortConfig, type PortConfig } from "./analytics.js";
 import type {
   ExtensionMessage,
   ExtensionResponse,
@@ -25,37 +25,77 @@ import type {
   LinkedInProfile,
 } from "./types.js";
 
-const BRIDGE_PORT = 9847; // Port for extension to connect to
+// Default port range (can be overridden by feature flag)
+const DEFAULT_PORT_START = 9847;
+const DEFAULT_PORT_COUNT = 10;
 const BRIDGE_HOST = "127.0.0.1" as const; // IPv4 only — avoids :: vs localhost mismatch and some EADDRINUSE cases
 const PING_INTERVAL = 30000; // 30 seconds
 const REQUEST_TIMEOUT = 60000; // 60 seconds for generation requests
 const MAX_PING_FAILURES = 3; // Disconnect after 3 consecutive ping failures
 const HEALTH_CHECK_TIMEOUT = 5000; // 5 seconds for health check ping
 
-/** Optional: set SOCIALS_MCP_RECLAIM_PORT=1 to SIGTERM listeners on BRIDGE_PORT before bind (stale Socials MCP server). */
-function tryReclaimBridgePort(port: number): void {
-  if (process.env.SOCIALS_MCP_RECLAIM_PORT !== "1") return;
+// Runtime port config (populated from feature flags at startup)
+let portConfig: PortConfig = { portStart: DEFAULT_PORT_START, portCount: DEFAULT_PORT_COUNT };
+
+/** Initialize port config from feature flags */
+export async function initPortConfig(): Promise<PortConfig> {
   try {
-    const out = execFileSync("lsof", ["-t", "-i", `TCP:${port}`], {
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "ignore"],
-    }).trim();
-    for (const pid of out.split("\n").filter(Boolean)) {
-      try {
-        process.kill(Number(pid), "SIGTERM");
-      } catch {
-        /* ignore */
-      }
-    }
+    portConfig = await getPortConfig();
+    console.log(`[ExtensionBridge] Port config: ${portConfig.portStart}-${portConfig.portStart + portConfig.portCount - 1} (${portConfig.portCount} ports)`);
   } catch {
-    /* no listeners */
+    console.log(`[ExtensionBridge] Using default port config: ${DEFAULT_PORT_START}-${DEFAULT_PORT_START + DEFAULT_PORT_COUNT - 1}`);
   }
+  return portConfig;
+}
+
+/** Get current port config */
+export function getCurrentPortConfig(): PortConfig {
+  return portConfig;
+}
+
+/** Check if a port is available */
+function isPortAvailable(port: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    const net = require("net");
+    const server = net.createServer();
+    server.once("error", () => resolve(false));
+    server.once("listening", () => {
+      server.close();
+      resolve(true);
+    });
+    server.listen(port, BRIDGE_HOST);
+  });
+}
+
+/** Find first available port in range */
+async function findAvailablePort(): Promise<number> {
+  // Check if user specified a port via env var
+  const envPort = process.env.SOCIALS_MCP_PORT;
+  if (envPort) {
+    const port = parseInt(envPort, 10);
+    if (!isNaN(port) && port > 0 && port < 65536) {
+      return port; // Use specified port, even if taken (will error later)
+    }
+  }
+
+  // Use config from feature flags
+  const portEnd = portConfig.portStart + portConfig.portCount - 1;
+
+  // Auto-find available port in range
+  for (let port = portConfig.portStart; port <= portEnd; port++) {
+    if (await isPortAvailable(port)) {
+      return port;
+    }
+  }
+  throw new Error(`No available ports in range ${portConfig.portStart}-${portEnd}. Close some MCP instances.`);
 }
 
 export class ExtensionBridge {
   private wss: WebSocketServer | null = null;
-  /** True after the WebSocket server has bound to BRIDGE_PORT (extension can dial in). */
+  /** True after the WebSocket server has bound to a port (extension can dial in). */
   private wsServerListening = false;
+  /** The port we're actually listening on */
+  private activePort: number = 0;
   private client: WebSocket | null = null;
   private pendingRequests = new Map<
     string,
@@ -71,19 +111,22 @@ export class ExtensionBridge {
   private lastPingLatencyMs: number | null = null;
 
   async start(): Promise<void> {
+    // Find available port first
+    const port = await findAvailablePort();
+    this.activePort = port;
+
     return new Promise((resolve, reject) => {
       try {
         this.wsServerListening = false;
-        tryReclaimBridgePort(BRIDGE_PORT);
         this.wss = new WebSocketServer({
-          port: BRIDGE_PORT,
+          port: port,
           host: BRIDGE_HOST,
         });
 
         this.wss.on("listening", () => {
           this.wsServerListening = true;
           console.error(
-            `[ExtensionBridge] WebSocket server listening on ${BRIDGE_HOST}:${BRIDGE_PORT} (extension must use ws://127.0.0.1:${BRIDGE_PORT})`
+            `[ExtensionBridge] WebSocket server listening on ${BRIDGE_HOST}:${port} (extension scans ports ${BRIDGE_PORT_START}-${BRIDGE_PORT_END})`
           );
           resolve();
         });
@@ -125,7 +168,7 @@ export class ExtensionBridge {
           this.wsServerListening = false;
           const hint =
             (error as NodeJS.ErrnoException).code === "EADDRINUSE"
-              ? ` Port ${BRIDGE_PORT} is in use. Quit duplicate Claude/MCP instances, or run: lsof -nP -iTCP:${BRIDGE_PORT} | grep LISTEN — then kill that PID. Or set SOCIALS_MCP_RECLAIM_PORT=1 in MCP env to reclaim the port (use with care).`
+              ? ` Port ${port} is in use (should not happen with auto-discovery). Try setting SOCIALS_MCP_PORT env var to a specific port.`
               : "";
           console.error("[ExtensionBridge] Server error:", error.message + hint);
           reject(error);
@@ -885,11 +928,12 @@ export class ExtensionBridge {
   }
 
   /**
-   * Restart the WebSocket bridge. Useful when the connection is stuck or port is in use.
-   * Force-kills any process on BRIDGE_PORT before restarting.
+   * Restart the WebSocket bridge. Useful when the connection is stuck.
+   * Will find a new available port automatically.
    */
   async restart(): Promise<{ success: boolean; message: string }> {
     console.error("[ExtensionBridge] Restarting bridge...");
+    const oldPort = this.activePort;
 
     // Stop existing server and connections
     this.stop();
@@ -897,36 +941,38 @@ export class ExtensionBridge {
     // Wait a moment for cleanup
     await new Promise(resolve => setTimeout(resolve, 500));
 
-    // Force reclaim the port (kill any stale processes)
-    try {
-      const out = execFileSync("lsof", ["-t", "-i", `TCP:${BRIDGE_PORT}`], {
-        encoding: "utf8",
-        stdio: ["ignore", "pipe", "ignore"],
-      }).trim();
-      for (const pid of out.split("\n").filter(Boolean)) {
-        const pidNum = Number(pid);
-        // Don't kill ourselves
-        if (pidNum !== process.pid) {
-          try {
-            process.kill(pidNum, "SIGTERM");
-            console.error(`[ExtensionBridge] Killed stale process ${pidNum} on port ${BRIDGE_PORT}`);
-          } catch {
-            /* ignore */
+    // If we had an old port, try to reclaim it by killing stale processes
+    if (oldPort > 0) {
+      try {
+        const out = execFileSync("lsof", ["-t", "-i", `TCP:${oldPort}`], {
+          encoding: "utf8",
+          stdio: ["ignore", "pipe", "ignore"],
+        }).trim();
+        for (const pid of out.split("\n").filter(Boolean)) {
+          const pidNum = Number(pid);
+          // Don't kill ourselves
+          if (pidNum !== process.pid) {
+            try {
+              process.kill(pidNum, "SIGTERM");
+              console.error(`[ExtensionBridge] Killed stale process ${pidNum} on port ${oldPort}`);
+            } catch {
+              /* ignore */
+            }
           }
         }
+        // Wait for processes to die
+        await new Promise(resolve => setTimeout(resolve, 500));
+      } catch {
+        /* no listeners - good */
       }
-      // Wait for processes to die
-      await new Promise(resolve => setTimeout(resolve, 500));
-    } catch {
-      /* no listeners - good */
     }
 
-    // Restart the server
+    // Restart the server (will find available port automatically)
     try {
       await this.start();
       return {
         success: true,
-        message: `Bridge restarted successfully. WebSocket server listening on ${BRIDGE_HOST}:${BRIDGE_PORT}. Please refresh the Socials extension in your browser to reconnect.`
+        message: `Bridge restarted successfully. WebSocket server listening on ${BRIDGE_HOST}:${this.activePort}. Extension will auto-discover this port.`
       };
     } catch (error) {
       const msg = error instanceof Error ? error.message : "Unknown error";
@@ -935,5 +981,10 @@ export class ExtensionBridge {
         message: `Failed to restart bridge: ${msg}`
       };
     }
+  }
+
+  /** Get the port this bridge is listening on */
+  getActivePort(): number {
+    return this.activePort;
   }
 }
