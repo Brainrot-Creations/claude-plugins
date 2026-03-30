@@ -164,6 +164,20 @@ Action: Note the post URL to delete manually later
 ```
 
 ```
+Test: socials_create_post (content: "Testing newlines:\n\nLine 1\nLine 2\nLine 3\n\n[timestamp]", platform: "x")
+Expected: success=true, post should display with proper line breaks
+Action: Note the post URL to delete manually later
+Note: Tests newline (\n) support in X compose box
+```
+
+```
+Test: socials_create_post with video (content: "Testing video upload [timestamp]", platform: "x", media: [video file])
+Expected: success=true, waits for upload progress to reach 100% before posting
+Action: Note the post URL to delete manually later
+Note: Tests video upload progress detection (waits for "Processing X%" to complete)
+```
+
+```
 Test: socials_engage_post (tweet_id: <id from feed>, like: true, bookmark: true)
 Expected: success=true
 Note: This will like and bookmark a real post
@@ -246,8 +260,16 @@ Expected: Returns profile details including:
   - Basic: name, headline, location, profileUrl
   - Connection: connectionDegree, followers, connections
   - Content: about, currentRole, experiences, education, skills
-  - Contact Info: emails[], phones[], websites[], birthday, twitter, address
+  - Contact Info: contactInfo object with emails[], phones[], websites[], birthday, twitter, address
 Note: Tab will briefly focus to trigger LinkedIn's lazy-loaded content
+Verify: Contact info extraction works (requires 1st degree connection for full data)
+```
+
+For contact info verification, navigate to a 1st degree connection:
+```
+Test: socials_linkedin_profile (on a 1st degree connection)
+Expected: contactInfo should contain at least some fields if shared by connection
+Note: Contact info visibility depends on the connection's privacy settings
 ```
 
 ### 6. LinkedIn Tests - Destructive [FULL MODE ONLY]
@@ -403,6 +425,12 @@ Total: XX/XX tests passed
 5. **Report issues clearly**: If something fails, explain what the user might need to fix
 
 6. **Timestamps**: Add timestamps to test posts/replies so they're identifiable
+
+7. **Newline testing**: When testing posts with \n characters, verify the output has actual line breaks
+
+8. **Video uploads**: Large video uploads may take 1-2 minutes; the extension waits for 100% progress
+
+9. **Modal targeting**: Posts/replies correctly target the modal compose box (not timeline composer)
 
 ---
 
