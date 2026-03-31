@@ -25447,7 +25447,8 @@ var PlatformFlags = {
 var PORT_CONFIG_FLAG = "mcp_port_config";
 var DEFAULT_PORT_CONFIG = {
   portStart: 9847,
-  portCount: 10
+  portCount: 10,
+  coordinatorPort: 9846
 };
 async function getPortConfig() {
   if (!featureFlagsFetchedAt || Date.now() - featureFlagsFetchedAt > FEATURE_FLAGS_TTL) {
@@ -25469,7 +25470,8 @@ async function getPortConfig() {
   }
   return {
     portStart: typeof config2.portStart === "number" ? config2.portStart : DEFAULT_PORT_CONFIG.portStart,
-    portCount: typeof config2.portCount === "number" ? config2.portCount : DEFAULT_PORT_CONFIG.portCount
+    portCount: typeof config2.portCount === "number" ? config2.portCount : DEFAULT_PORT_CONFIG.portCount,
+    coordinatorPort: typeof config2.coordinatorPort === "number" ? config2.coordinatorPort : DEFAULT_PORT_CONFIG.coordinatorPort
   };
 }
 var ToolFlags = {
@@ -25760,6 +25762,7 @@ async function trackError(toolName, errorMessage) {
   await captureAsync("mcp_tool_error", { tool: toolName, error: errorMessage.slice(0, 200), error_category: category });
 }
 function analyzeContent(content) {
+  if (!content) return { hashtag_count: 0, hashtags: [], mention_count: 0, mentions: [], url_count: 0, has_emoji: false, word_count: 0, character_count: 0 };
   const hashtags = content.match(/#\w+/g) || [];
   const mentions = content.match(/@\w+/g) || [];
   const urls = content.match(/https?:\/\/[^\s]+/g) || [];
@@ -25827,7 +25830,10 @@ var PING_INTERVAL = 3e4;
 var REQUEST_TIMEOUT = 6e4;
 var MAX_PING_FAILURES = 3;
 var HEALTH_CHECK_TIMEOUT = 5e3;
-var portConfig = { portStart: DEFAULT_PORT_START, portCount: DEFAULT_PORT_COUNT };
+var portConfig = { portStart: DEFAULT_PORT_START, portCount: DEFAULT_PORT_COUNT, coordinatorPort: DEFAULT_COORDINATOR_PORT };
+function getCoordinatorPort() {
+  return portConfig.coordinatorPort || DEFAULT_COORDINATOR_PORT;
+}
 async function initPortConfig() {
   console.error("[ExtensionBridge] Initializing port config...");
   try {
@@ -25872,7 +25878,7 @@ async function findAvailablePort() {
   }
   throw new Error(`No available ports in range ${portConfig.portStart}-${portEnd}. Close some MCP instances.`);
 }
-var COORDINATOR_PORT = 9846;
+var DEFAULT_COORDINATOR_PORT = 9846;
 var ExtensionBridge = class {
   wss = null;
   /** True after the WebSocket server has bound to a port (extension can dial in). */
@@ -25908,19 +25914,20 @@ var ExtensionBridge = class {
    * The coordinator relays messages to/from the Chrome extension via native messaging.
    */
   startAsCoordinatorClient() {
+    const coordPort = getCoordinatorPort();
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
         reject(new Error("Coordinator connection timeout"));
       }, 3e3);
-      const ws = new import_websocket.default(`ws://${BRIDGE_HOST}:${COORDINATOR_PORT}`);
+      const ws = new import_websocket.default(`ws://${BRIDGE_HOST}:${coordPort}`);
       ws.on("open", () => {
         clearTimeout(timeout);
         this.mode = "coordinator";
         this.wsServerListening = true;
         this.client = ws;
-        this.activePort = COORDINATOR_PORT;
+        this.activePort = coordPort;
         ws.send(JSON.stringify({ type: "register", mcpId: this.mcpId }));
-        console.error(`[ExtensionBridge] \u2713 Connected to coordinator on port ${COORDINATOR_PORT} (mcpId: ${this.mcpId})`);
+        console.error(`[ExtensionBridge] \u2713 Connected to coordinator on port ${coordPort} (mcpId: ${this.mcpId})`);
         this.startPingInterval();
         resolve();
       });

@@ -765,6 +765,7 @@ export async function trackError(toolName: string, errorMessage: string): Promis
 // ============ Action-Specific Events ============
 
 function analyzeContent(content: string) {
+  if (!content) return { hashtag_count: 0, hashtags: [], mention_count: 0, mentions: [], url_count: 0, has_emoji: false, word_count: 0, character_count: 0 };
   const hashtags = content.match(/#\w+/g) || [];
   const mentions = content.match(/@\w+/g) || [];
   const urls = content.match(/https?:\/\/[^\s]+/g) || [];
