@@ -46,6 +46,40 @@ import {
 
 const bridge = new ExtensionBridge();
 
+// ============ Parameter Alias Resolution ============
+// Agents commonly use alternative parameter names (e.g., tweet_id instead of post_id).
+// These helpers normalize args so tools work regardless of naming convention.
+
+function resolveParam(args: Record<string, unknown>, ...keys: string[]): unknown {
+  for (const key of keys) {
+    if (args[key] !== undefined) return args[key];
+  }
+  return undefined;
+}
+
+function requireParam<T = string>(args: Record<string, unknown>, name: string, ...aliases: string[]): T {
+  const value = resolveParam(args, name, ...aliases);
+  if (value === undefined || value === null || value === "") {
+    throw new Error(`Missing required parameter "${name}". Got: ${Object.keys(args).join(", ")}. Aliases checked: ${[name, ...aliases].join(", ")}`);
+  }
+  return value as T;
+}
+
+/** Resolve post/tweet ID from common parameter name variations */
+function resolvePostId(args: Record<string, unknown>): string {
+  return requireParam(args, "post_id", "postId", "tweet_id", "tweetId", "id");
+}
+
+/** Resolve content/text from common parameter name variations */
+function resolveContent(args: Record<string, unknown>): string {
+  return requireParam(args, "content", "text", "reply", "body", "message");
+}
+
+/** Resolve profile URL from common parameter name variations */
+function resolveProfileUrl(args: Record<string, unknown>): string {
+  return requireParam(args, "profile_url", "profileUrl", "url", "profile");
+}
+
 // Tool schemas
 const GetFeedPostsSchema = z.object({
   platform: z
@@ -1234,13 +1268,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case "socials_quick_reply": {
         await requireProAccess();
-        // Accept both post_id/content (schema) and tweet_id/reply (common agent mistake)
-        const a = args as Record<string, unknown>;
-        const postId = (a.post_id ?? a.tweet_id ?? a.postId) as string | undefined;
-        const content = (a.content ?? a.reply ?? a.text) as string | undefined;
-        if (!postId || !content) {
-          throw new Error(`Missing required parameters. Got: ${Object.keys(a).join(", ")}. Need: post_id, content`);
-        }
+        const postId = resolvePostId(args as Record<string, unknown>);
+        const content = resolveContent(args as Record<string, unknown>);
         const rawMedia = (args as { media?: Array<{ path: string; type: "image" | "video" | "gif" }> }).media;
 
         // Process media: convert local files to base64, keep URLs as-is (same as create_post)
@@ -1541,8 +1570,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case "socials_x_quote_tweet": {
         await requireProAccess();
-        const postId = (args as { post_id: string }).post_id;
-        const content = (args as { content: string }).content;
+        const postId = resolvePostId(args as Record<string, unknown>);
+        const content = resolveContent(args as Record<string, unknown>);
         const rawMedia = (args as { media?: Array<{ path: string; type: "image" | "video" | "gif" }> }).media;
 
         // Process media: convert local files to base64, keep URLs as-is (same as quick_reply)
@@ -1975,7 +2004,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case "socials_linkedin_connect": {
         await requireProAccess();
-        const profileUrl = (args as { profile_url: string }).profile_url;
+        const profileUrl = resolveProfileUrl(args as Record<string, unknown>);
         const note = (args as { note?: string }).note;
         const result = await bridge.linkedinConnectV2(profileUrl, note);
 
@@ -1996,7 +2025,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case "socials_linkedin_profile": {
         await requireProAccess();
-        const profileUrl = (args as { profile_url: string }).profile_url;
+        const profileUrl = resolveProfileUrl(args as Record<string, unknown>);
         const result = await bridge.linkedinProfileV2(profileUrl);
 
         // Track profile viewed with timing
@@ -2016,7 +2045,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case "socials_linkedin_connection_status": {
         await requireProAccess();
-        const profileUrl = (args as { profile_url: string }).profile_url;
+        const profileUrl = resolveProfileUrl(args as Record<string, unknown>);
         const result = await bridge.linkedinConnectionStatus(profileUrl);
         await trackToolUsage(name, "linkedin", result.success, getElapsed());
 
@@ -2032,7 +2061,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case "socials_linkedin_engage": {
         await requireProAccess();
-        const postId = (args as { post_id: string }).post_id;
+        const postId = resolvePostId(args as Record<string, unknown>);
         const actions = (args as { actions: string[] }).actions as Array<
           "like" | "repost" | "quote_repost"
         >;

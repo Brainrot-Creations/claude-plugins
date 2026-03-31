@@ -26436,6 +26436,28 @@ var ExtensionBridge = class {
 
 // src/index.ts
 var bridge = new ExtensionBridge();
+function resolveParam(args, ...keys) {
+  for (const key of keys) {
+    if (args[key] !== void 0) return args[key];
+  }
+  return void 0;
+}
+function requireParam(args, name, ...aliases) {
+  const value = resolveParam(args, name, ...aliases);
+  if (value === void 0 || value === null || value === "") {
+    throw new Error(`Missing required parameter "${name}". Got: ${Object.keys(args).join(", ")}. Aliases checked: ${[name, ...aliases].join(", ")}`);
+  }
+  return value;
+}
+function resolvePostId(args) {
+  return requireParam(args, "post_id", "postId", "tweet_id", "tweetId", "id");
+}
+function resolveContent(args) {
+  return requireParam(args, "content", "text", "reply", "body", "message");
+}
+function resolveProfileUrl(args) {
+  return requireParam(args, "profile_url", "profileUrl", "url", "profile");
+}
 var GetFeedPostsSchema = external_exports.object({
   platform: external_exports.enum(["x", "linkedin", "reddit"]).describe("Social media platform"),
   count: external_exports.number().optional().default(10).describe("Number of posts to fetch (default: 10)")
@@ -27410,12 +27432,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       // }
       case "socials_quick_reply": {
         await requireProAccess();
-        const a = args;
-        const postId = a.post_id ?? a.tweet_id ?? a.postId;
-        const content = a.content ?? a.reply ?? a.text;
-        if (!postId || !content) {
-          throw new Error(`Missing required parameters. Got: ${Object.keys(a).join(", ")}. Need: post_id, content`);
-        }
+        const postId = resolvePostId(args);
+        const content = resolveContent(args);
         const rawMedia = args.media;
         const processedMedia = rawMedia ? await Promise.all(
           rawMedia.map(async (item) => {
@@ -27647,8 +27665,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
       case "socials_x_quote_tweet": {
         await requireProAccess();
-        const postId = args.post_id;
-        const content = args.content;
+        const postId = resolvePostId(args);
+        const content = resolveContent(args);
         const rawMedia = args.media;
         const processedMedia = rawMedia ? await Promise.all(
           rawMedia.map(async (item) => {
@@ -28004,7 +28022,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       // ============ V2 Intent-Oriented Handlers ============
       case "socials_linkedin_connect": {
         await requireProAccess();
-        const profileUrl = args.profile_url;
+        const profileUrl = resolveProfileUrl(args);
         const note = args.note;
         const result = await bridge.linkedinConnectV2(profileUrl, note);
         const elapsed = getElapsed();
@@ -28021,7 +28039,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
       case "socials_linkedin_profile": {
         await requireProAccess();
-        const profileUrl = args.profile_url;
+        const profileUrl = resolveProfileUrl(args);
         const result = await bridge.linkedinProfileV2(profileUrl);
         const elapsed = getElapsed();
         trackProfileViewed(result.success, elapsed);
@@ -28037,7 +28055,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
       case "socials_linkedin_connection_status": {
         await requireProAccess();
-        const profileUrl = args.profile_url;
+        const profileUrl = resolveProfileUrl(args);
         const result = await bridge.linkedinConnectionStatus(profileUrl);
         await trackToolUsage(name, "linkedin", result.success, getElapsed());
         return {
@@ -28051,7 +28069,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
       case "socials_linkedin_engage": {
         await requireProAccess();
-        const postId = args.post_id;
+        const postId = resolvePostId(args);
         const actions = args.actions;
         const result = await bridge.linkedinEngagePost({
           platform: "linkedin",
