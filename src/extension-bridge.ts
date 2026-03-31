@@ -39,15 +39,16 @@ let portConfig: PortConfig = { portStart: DEFAULT_PORT_START, portCount: DEFAULT
 
 /** Initialize port config from feature flags (with 5s timeout) */
 export async function initPortConfig(): Promise<PortConfig> {
+  console.error("[ExtensionBridge] Initializing port config...");
   try {
     // Add timeout to prevent hanging on slow PostHog fetch
     const timeoutPromise = new Promise<PortConfig>((_, reject) =>
       setTimeout(() => reject(new Error("Timeout")), 5000)
     );
     portConfig = await Promise.race([getPortConfig(), timeoutPromise]);
-    console.log(`[ExtensionBridge] Port config: ${portConfig.portStart}-${portConfig.portStart + portConfig.portCount - 1} (${portConfig.portCount} ports)`);
-  } catch {
-    console.log(`[ExtensionBridge] Using default port config: ${DEFAULT_PORT_START}-${DEFAULT_PORT_START + DEFAULT_PORT_COUNT - 1}`);
+    console.error(`[ExtensionBridge] Port config loaded: ${portConfig.portStart}-${portConfig.portStart + portConfig.portCount - 1} (${portConfig.portCount} ports)`);
+  } catch (err) {
+    console.error(`[ExtensionBridge] Port config fetch failed (using defaults ${DEFAULT_PORT_START}-${DEFAULT_PORT_START + DEFAULT_PORT_COUNT - 1}):`, err);
   }
   return portConfig;
 }
@@ -116,8 +117,10 @@ export class ExtensionBridge {
 
   async start(): Promise<void> {
     // Find available port first
+    console.error(`[ExtensionBridge] Finding available port in range ${portConfig.portStart}-${portConfig.portStart + portConfig.portCount - 1}...`);
     const port = await findAvailablePort();
     this.activePort = port;
+    console.error(`[ExtensionBridge] Found available port: ${port}. Starting WebSocket server...`);
 
     return new Promise((resolve, reject) => {
       try {

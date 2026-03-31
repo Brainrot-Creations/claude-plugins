@@ -25829,14 +25829,15 @@ var MAX_PING_FAILURES = 3;
 var HEALTH_CHECK_TIMEOUT = 5e3;
 var portConfig = { portStart: DEFAULT_PORT_START, portCount: DEFAULT_PORT_COUNT };
 async function initPortConfig() {
+  console.error("[ExtensionBridge] Initializing port config...");
   try {
     const timeoutPromise = new Promise(
       (_, reject) => setTimeout(() => reject(new Error("Timeout")), 5e3)
     );
     portConfig = await Promise.race([getPortConfig(), timeoutPromise]);
-    console.log(`[ExtensionBridge] Port config: ${portConfig.portStart}-${portConfig.portStart + portConfig.portCount - 1} (${portConfig.portCount} ports)`);
-  } catch {
-    console.log(`[ExtensionBridge] Using default port config: ${DEFAULT_PORT_START}-${DEFAULT_PORT_START + DEFAULT_PORT_COUNT - 1}`);
+    console.error(`[ExtensionBridge] Port config loaded: ${portConfig.portStart}-${portConfig.portStart + portConfig.portCount - 1} (${portConfig.portCount} ports)`);
+  } catch (err) {
+    console.error(`[ExtensionBridge] Port config fetch failed (using defaults ${DEFAULT_PORT_START}-${DEFAULT_PORT_START + DEFAULT_PORT_COUNT - 1}):`, err);
   }
   return portConfig;
 }
@@ -25884,8 +25885,10 @@ var ExtensionBridge = class {
   lastSuccessfulPing = null;
   lastPingLatencyMs = null;
   async start() {
+    console.error(`[ExtensionBridge] Finding available port in range ${portConfig.portStart}-${portConfig.portStart + portConfig.portCount - 1}...`);
     const port = await findAvailablePort();
     this.activePort = port;
+    console.error(`[ExtensionBridge] Found available port: ${port}. Starting WebSocket server...`);
     return new Promise((resolve, reject) => {
       try {
         this.wsServerListening = false;
