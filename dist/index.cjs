@@ -26666,17 +26666,17 @@ var allTools = [
   // },
   {
     name: "socials_quick_reply",
-    description: "Reply from the pinned agent tab's feed (see socials_open_tab)\u2014that tab need not be focused. Clicks reply on the tweet, types the content, optionally attaches media (images, GIFs, videos), and posts. You can write the reply yourself OR use socials_generate_reply first if you want to use the user's persona. IMPORTANT: Always confirm with the user before posting.",
+    description: "Reply to a tweet in the pinned agent tab's feed. Pass post_id (from socials_get_feed) and content (your reply text). IMPORTANT: Always confirm with the user before posting.",
     inputSchema: {
       type: "object",
       properties: {
         post_id: {
           type: "string",
-          description: "Tweet/post ID to reply to"
+          description: "The tweet ID from socials_get_feed results (e.g. '2039054554721824939')"
         },
         content: {
           type: "string",
-          description: "The reply content (you can write this yourself)"
+          description: "Your reply text"
         },
         media: {
           type: "array",
@@ -26741,18 +26741,18 @@ var allTools = [
   },
   {
     name: "socials_engage_post",
-    description: "On X, perform engagement on a tweet visible in the pinned agent tab (home timeline, list, etc.; tab need not be focused). Uses the tweet id from socials_get_feed. Runs actions in order: like, repost (simple repost, not quote), bookmark, and/or share (opens share menu). Like/bookmark/repost are toggles on X\u2014calling again may undo. IMPORTANT: Only use when the user explicitly wants these actions.",
+    description: "Engage with a tweet (like, repost, bookmark, share). Pass post_id from socials_get_feed. Actions are toggles \u2014 calling again may undo. IMPORTANT: Only use when the user explicitly wants these actions.",
     inputSchema: {
       type: "object",
       properties: {
         platform: {
           type: "string",
           enum: ["x"],
-          description: "Must be x"
+          description: "Must be 'x'"
         },
         post_id: {
           type: "string",
-          description: "Tweet status id"
+          description: "The tweet ID from socials_get_feed results"
         },
         actions: {
           type: "array",
@@ -26838,17 +26838,17 @@ var allTools = [
   },
   {
     name: "socials_x_quote_tweet",
-    description: "Quote tweet a post on X. Opens the quote compose dialog, types the content, optionally attaches media, and posts. IMPORTANT: Always confirm with the user before posting.",
+    description: "Quote tweet a post on X. Pass post_id (from socials_get_feed) and content (your quote text). IMPORTANT: Always confirm with the user before posting.",
     inputSchema: {
       type: "object",
       properties: {
         post_id: {
           type: "string",
-          description: "Tweet/post ID to quote (from socials_get_feed)"
+          description: "The tweet ID from socials_get_feed results"
         },
         content: {
           type: "string",
-          description: "Your quote tweet content"
+          description: "Your quote tweet text"
         },
         media: {
           type: "array",
@@ -27081,13 +27081,13 @@ var allTools = [
   // LinkedIn Profile & Connection Tools (handle navigation internally)
   {
     name: "socials_linkedin_connect",
-    description: "Send a connection request on LinkedIn. Automatically navigates to the profile if needed. Returns rich status: already_connected, pending_sent, pending_received, follow_only, or success. IMPORTANT: Always confirm with the user before sending connection requests.",
+    description: "Send a LinkedIn connection request. Pass profile_url (e.g. 'https://linkedin.com/in/username'). Auto-navigates to the profile. Returns status: already_connected, pending_sent, success, etc. IMPORTANT: Always confirm with the user before sending.",
     inputSchema: {
       type: "object",
       properties: {
         profile_url: {
           type: "string",
-          description: "LinkedIn profile URL (full URL or /in/username)"
+          description: "LinkedIn profile URL, e.g. 'https://www.linkedin.com/in/satyanadella'"
         },
         note: {
           type: "string",
@@ -27099,13 +27099,13 @@ var allTools = [
   },
   {
     name: "socials_linkedin_profile",
-    description: "Get LinkedIn profile information. Navigates to the profile and extracts data in one call. Returns name, headline, about, experience, education, skills, connection status, and contact info (emails, phones, websites, birthday, twitter, etc. from the Contact Info dialog).",
+    description: "Get a LinkedIn profile. Pass profile_url \u2014 auto-navigates and extracts name, headline, about, experience, education, skills, contact info.",
     inputSchema: {
       type: "object",
       properties: {
         profile_url: {
           type: "string",
-          description: "LinkedIn profile URL (full URL or /in/username)"
+          description: "LinkedIn profile URL, e.g. 'https://www.linkedin.com/in/satyanadella'"
         }
       },
       required: ["profile_url"]
@@ -27113,13 +27113,13 @@ var allTools = [
   },
   {
     name: "socials_linkedin_connection_status",
-    description: "Check the connection status with a LinkedIn user without sending a request. Returns: connected, pending_sent, pending_received, not_connected, or follow_only.",
+    description: "Check connection status with a LinkedIn user (read-only, no request sent). Returns: connected, pending_sent, not_connected, etc.",
     inputSchema: {
       type: "object",
       properties: {
         profile_url: {
           type: "string",
-          description: "LinkedIn profile URL (full URL or /in/username)"
+          description: "LinkedIn profile URL, e.g. 'https://www.linkedin.com/in/satyanadella'"
         }
       },
       required: ["profile_url"]
@@ -27127,13 +27127,13 @@ var allTools = [
   },
   {
     name: "socials_linkedin_engage",
-    description: "Engage with a LinkedIn post visible on the current feed or search results page. Use socials_get_feed first to get post IDs, then pass the post_id here. Actions: like (toggle), repost (instant), quote_repost (opens dialog). IMPORTANT: Only use when the user explicitly wants these actions.",
+    description: "Engage with a LinkedIn post. Pass post_id from socials_get_feed. Actions: like (toggle), repost, quote_repost. IMPORTANT: Only use when the user explicitly wants these actions.",
     inputSchema: {
       type: "object",
       properties: {
         post_id: {
           type: "string",
-          description: "LinkedIn post ID/URN from socials_get_feed"
+          description: "The post ID from socials_get_feed results"
         },
         actions: {
           type: "array",
