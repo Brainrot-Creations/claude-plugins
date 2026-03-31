@@ -18,7 +18,10 @@ sed -i '' "s/\"version\": \"[^\"]*\"/\"version\": \"$VERSION\"/" "$ROOT/package.
 # 2. .claude-plugin/plugin.json
 sed -i '' "s/\"version\": \"[^\"]*\"/\"version\": \"$VERSION\"/" "$ROOT/.claude-plugin/plugin.json"
 
-# 3 & 4. src/index.ts — Server constructor version + check_access response version
+# 3. .claude-plugin/marketplace.json (two version fields: metadata + plugin entry)
+sed -i '' "s/\"version\": \"[^\"]*\"/\"version\": \"$VERSION\"/g" "$ROOT/.claude-plugin/marketplace.json"
+
+# 4 & 5. src/index.ts — Server constructor version + check_access response version
 sed -i '' "s/version: \"[0-9]*\.[0-9]*\.[0-9]*\"/version: \"$VERSION\"/g" "$ROOT/src/index.ts"
 
 # Rebuild dist
@@ -29,6 +32,7 @@ cd "$ROOT" && npm run build
 git add \
   "$ROOT/package.json" \
   "$ROOT/.claude-plugin/plugin.json" \
+  "$ROOT/.claude-plugin/marketplace.json" \
   "$ROOT/src/index.ts" \
   "$ROOT/dist/index.cjs" \
   "$ROOT/dist/native-messaging-host.cjs" \
