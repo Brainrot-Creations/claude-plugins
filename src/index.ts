@@ -255,7 +255,7 @@ const ReloadTabSchema = z.object({
 const server = new Server(
   {
     name: "claude-plugins",
-    version: "1.0.0",
+    version: "1.1.11",
   },
   {
     capabilities: {
@@ -2123,7 +2123,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
               type: "text",
               text: JSON.stringify({
                 status: "ok",
-                version: "1.1.4",
+                version: "1.1.11",
                 extension_connected: extensionConnected,
                 health,
                 engagement,
