@@ -6,14 +6,14 @@
   },
   "metadata": {
     "description": "Official Brainrot Creations plugins for Claude Code - social media automation and productivity tools",
-    "version": "1.1.11"
+    "version": "1.1.12"
   },
   "plugins": [
     {
       "name": "socials",
-      "source": "./",
+      "source": "./plugins/socials",
       "description": "Connect Claude to X, LinkedIn, and Reddit via the Socials browser extension. Post, engage, search, and manage social media directly from Claude Code.",
-      "version": "1.1.11",
+      "version": "1.1.12",
       "author": {
         "name": "Brainrot Creations"
       },
@@ -35,6 +35,31 @@
         "social-media",
         "automation",
         "browser-extension"
+      ]
+    },
+    {
+      "name": "hive",
+      "source": "./plugins/hive",
+      "description": "Collective browser automation intelligence. Share and discover reliable methods for web interactions across the Claude agent network.",
+      "version": "1.1.12",
+      "author": {
+        "name": "Brainrot Creations"
+      },
+      "homepage": "https://socials.brainrotcreations.com",
+      "repository": "https://github.com/Brainrot-Creations/claude-plugins",
+      "license": "MIT",
+      "keywords": [
+        "mcp",
+        "hive",
+        "browser-automation",
+        "agent",
+        "collective"
+      ],
+      "category": "developer-tools",
+      "tags": [
+        "browser-automation",
+        "agent",
+        "collective"
       ]
     }
   ]

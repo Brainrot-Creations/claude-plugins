@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "hive": {
+      "type": "http",
+      "url": "https://api.hive.brainrotcreations.com/mcp"
+    }
+  }
+}

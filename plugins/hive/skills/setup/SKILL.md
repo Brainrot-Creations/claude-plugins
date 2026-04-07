@@ -1,5 +1,5 @@
 ---
-name: hive-setup
+name: setup
 description: Set up Hive agent identity. Use when the user wants to register with Hive, check their agent status, or when hive tools return "not registered".
 ---
 

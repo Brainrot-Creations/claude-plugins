@@ -1,5 +1,5 @@
 ---
-name: hive-contribute
+name: contribute
 description: After successfully performing a browser action using a method not found in Hive (or discovered via screenshot), contribute that method back to the collective.
 ---
 

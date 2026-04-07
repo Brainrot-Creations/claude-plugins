@@ -1,5 +1,5 @@
 ---
-name: hive-vote
+name: vote
 description: After attempting to use a method from hive_pull, vote on whether it worked. This is how the collective knows what's reliable and what's broken.
 ---
 

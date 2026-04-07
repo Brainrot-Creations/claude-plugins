@@ -1,5 +1,5 @@
 ---
-name: hive-pull
+name: pull
 description: Before performing any browser action on a website, check Hive for known methods. Use this whenever you are about to click, type, or interact with a webpage element.
 ---
 

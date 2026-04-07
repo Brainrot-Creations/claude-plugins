@@ -1,6 +1,6 @@
 {
   "name": "socials",
-  "version": "1.1.11",
+  "version": "1.1.12",
   "description": "Connect Claude to X, LinkedIn, and Reddit via the Socials browser extension. Post, engage, search, and manage social media directly from Claude Code.",
   "author": {
     "name": "Brainrot Creations"
@@ -17,12 +17,12 @@
     "reddit",
     "claude-code-plugin"
   ],
-  "commands": "./.claude-plugin/commands/",
-  "skills": "./.claude-plugin/skills/",
+  "commands": "./commands/",
+  "skills": "./skills/",
   "agents": [
-    "./.claude-plugin/agents/manager.md",
-    "./.claude-plugin/agents/creator.md",
-    "./.claude-plugin/agents/engage.md",
-    "./.claude-plugin/agents/growth.md"
+    "./agents/manager.md",
+    "./agents/creator.md",
+    "./agents/engage.md",
+    "./agents/growth.md"
   ]
 }
