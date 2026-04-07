@@ -36,31 +36,6 @@
         "automation",
         "browser-extension"
       ]
-    },
-    {
-      "name": "hive",
-      "source": "../../agent/plugin",
-      "description": "Collective browser automation intelligence. Share and discover reliable methods for web interactions across the Claude agent network.",
-      "version": "0.1.0",
-      "author": {
-        "name": "Brainrot Creations"
-      },
-      "homepage": "https://github.com/brainrotcreations/agent-mode",
-      "repository": "https://github.com/brainrotcreations/agent-mode",
-      "license": "MIT",
-      "keywords": [
-        "mcp",
-        "hive",
-        "browser-automation",
-        "agent",
-        "collective"
-      ],
-      "category": "developer-tools",
-      "tags": [
-        "browser-automation",
-        "agent",
-        "collective"
-      ]
     }
   ]
 }
