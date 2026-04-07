@@ -25,13 +25,4 @@
     "./.claude-plugin/agents/engage.md",
     "./.claude-plugin/agents/growth.md"
   ],
-  "mcpServers": {
-    "socials": {
-      "command": "node",
-      "args": ["${CLAUDE_PLUGIN_ROOT}/dist/index.cjs"],
-      "env": {
-        "SOCIALS_MCP_RECLAIM_PORT": "1"
-      }
-    }
-  }
 }

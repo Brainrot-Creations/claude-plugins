@@ -9,7 +9,7 @@
     },
     "hive": {
       "type": "http",
-      "url": "https://api.hive.brainrotcreations.com/mcp"
+      "url": "http://localhost:3000/mcp"
     }
   }
 }
