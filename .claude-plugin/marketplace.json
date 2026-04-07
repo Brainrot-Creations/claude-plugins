@@ -1,6 +1,6 @@
 {
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
-  "name": "brainrot-creations ✧",
+  "name": "brainrot-creations",
   "description": "Official Brainrot Creations plugins for Claude Code — social media automation and collective browser intelligence",
   "owner": {
     "name": "Brainrot Creations",
