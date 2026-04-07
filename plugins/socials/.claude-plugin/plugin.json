@@ -1,11 +1,8 @@
 {
   "name": "socials",
-  "version": "1.1.12",
   "description": "Connect Claude to X, LinkedIn, and Reddit via the Socials browser extension. Post, engage, search, and manage social media directly from Claude Code.",
   "author": {
-    "name": "Brainrot Creations"
-  },
-  "homepage": "https://socials.brainrotcreations.com",
-  "repository": "https://github.com/Brainrot-Creations/claude-plugins",
-  "license": "MIT"
+    "name": "Brainrot Creations",
+    "email": "support@brainrotcreations.com"
+  }
 }
