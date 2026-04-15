@@ -20,7 +20,7 @@ Follow this flow unless the user explicitly asks for something else.
 - **If platform is X:** use **`socials_x_search`** first, then **`socials_get_feed`** / **`socials_quick_reply`** / (optionally) **`socials_engage_post`** on results.
 - **If platform is LinkedIn:** use **`socials_open_tab`** with `https://www.linkedin.com/feed/` and then **`socials_get_feed`** / **`socials_quick_reply`** (optionally **`socials_scroll`**) to work with posts and replies. Use **`socials_linkedin_posts_search`** to search for posts, then **`socials_get_feed`** to read results. Use **`socials_linkedin_engage_post`** to like or repost.
 - **If platform is Reddit:** use **`socials_open_tab`** with the subreddit URL and then **`socials_get_feed`** / **`socials_quick_reply`** (optionally **`socials_scroll`**) to work with posts.
-- **If the user wants YouTube:** use **`socials_open_tab`** with `https://www.youtube.com/` (home), a watch URL, or **search results** `https://www.youtube.com/results?search_query=...` where the query value is **URL-encoded** (same idea as `encodeURIComponent`). Refine search with **`socials_navigate`** on the agent tab. To apply filters (Type/Duration/Upload date/Features/Prioritize), use the standard tool **`socials_apply_search_filters`** with `platform: "youtube"` and filter labels. Feed/reply tools (**`socials_get_feed`**, **`socials_quick_reply`**, etc.) are for X/LinkedIn/Reddit only—not for parsing YouTube result lists unless a future adapter exists.
+- **If the user wants YouTube:** use **`socials_open_tab`** with `https://www.youtube.com/` (home), a watch URL, or **search results** `https://www.youtube.com/results?search_query=...` where the query value is **URL-encoded** (same idea as `encodeURIComponent`). Refine search with **`socials_navigate`** on the agent tab. To apply filters (Type/Duration/Upload date/Features/Prioritize), use **`socials_apply_search_filters`** with `platform: "youtube"` and filter labels. Read search cards with **`socials_get_page_content`**; on **watch** pages use **`socials_get_page_content`** for metadata + comments (each has **`commentId`** — the YouTube `lc` token). To **reply to a YouTube comment**, use **`socials_quick_reply`** with `post_id` set to that **`commentId`**. **`socials_get_feed`** is not used for YouTube.
 
 ## 3. Read content
 
@@ -36,7 +36,7 @@ Follow this flow unless the user explicitly asks for something else.
 
 - **`socials_list_personas`** — when the user cares about tone or persona-backed generation.
 - **`socials_generate_reply`** — optional AI-assisted draft from Socials (Pro); you may also write copy yourself.
-- **`socials_quick_reply`** — posts a reply **in the browser** from the feed. **Always confirm exact text with the user before calling** — this is a real post.
+- **`socials_quick_reply`** — posts a reply **in the browser**: X/LinkedIn from the feed (post id from **`socials_get_feed`**); **YouTube watch** — `post_id` = **`commentId`** from **`socials_get_page_content`** `page_data.comments`. **Always confirm exact text with the user before calling** — this is a real post.
 
 ## 5. Errors and limits
 
