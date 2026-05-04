@@ -124,6 +124,9 @@ class ACPClient {
     });
 
     const chunks = [];
+    // Track tool names by ID so tool_call_update can reference them
+    const toolNames = new Map();
+
     const unsub = this.on('session/update', (msg) => {
       const u = msg.params?.update;
       if (!u) return;
@@ -132,14 +135,24 @@ class ACPClient {
         chunks.push(u.content.text);
         process.stderr.write(u.content.text);
         onUpdate?.({ type: 'text', text: u.content.text });
-      } else if (u.sessionUpdate === 'tool_call') {
-        const label = `\n[tool_call] ${u.name || u.toolName || 'unknown'}(${JSON.stringify(u.input ?? u.arguments ?? {})})\n`;
-        process.stderr.write(label);
-        onUpdate?.({ type: 'tool_call', name: u.name || u.toolName, input: u.input ?? u.arguments });
-      } else if (u.sessionUpdate === 'tool_result') {
-        const label = `[tool_result] ${JSON.stringify(u.output ?? u.content ?? u.result)}\n`;
-        process.stderr.write(label);
-        onUpdate?.({ type: 'tool_result', output: u.output ?? u.content ?? u.result });
+      } else if (u.sessionUpdate === 'agent_thought_chunk' && u.content?.text) {
+        process.stderr.write(`[thinking] ${u.content.text}`);
+        onUpdate?.({ type: 'thinking', text: u.content.text });
+      } else if (u.sessionUpdate === 'tool_call' && u.status === 'pending') {
+        const name = u.title || u.name || u.toolName || 'unknown';
+        const kind = u.kind ? ` (${u.kind})` : '';
+        const input = u.rawInput ?? u.input ?? u.arguments ?? {};
+        if (u.toolCallId) toolNames.set(u.toolCallId, name);
+        const inputStr = Object.keys(input).length ? ` ${JSON.stringify(input)}` : '';
+        process.stderr.write(`\n[tool_call] ${name}${kind}${inputStr}\n`);
+        onUpdate?.({ type: 'tool_call', name, kind: u.kind, input, id: u.toolCallId });
+      } else if (u.sessionUpdate === 'tool_call_update') {
+        const status = u.status;
+        if (status === 'completed' || status === 'failed' || status === 'rejected') {
+          const name = toolNames.get(u.toolCallId) || 'tool';
+          process.stderr.write(`[tool_done] ${name} [${status}]\n`);
+          onUpdate?.({ type: 'tool_done', name, status, id: u.toolCallId });
+        }
       } else if (u.sessionUpdate === 'status' && u.status) {
         process.stderr.write(`[status] ${u.status}\n`);
         onUpdate?.({ type: 'status', status: u.status });
@@ -287,11 +300,27 @@ const TOOLS = [
 async function callTool(name, args) {
   switch (name) {
     case 'cursor_run': {
-      const events = [];
+      const log = [];
       process.stderr.write('[cursor-agent] starting session\n');
-      const res = await acp.runSession(args.prompt, args.cwd, args.timeout_ms, (e) => events.push(e));
+      const res = await acp.runSession(args.prompt, args.cwd, args.timeout_ms, (e) => {
+        if (e.type === 'tool_call') {
+          const kind = e.kind ? ` (${e.kind})` : '';
+          const inputStr = Object.keys(e.input ?? {}).length ? ` ${JSON.stringify(e.input)}` : '';
+          log.push(`[tool_call] ${e.name}${kind}${inputStr}`);
+        } else if (e.type === 'tool_done') {
+          log.push(`[tool_done] ${e.name} [${e.status}]`);
+        } else if (e.type === 'status') {
+          log.push(`[status] ${e.status}`);
+        }
+        // thinking chunks are stderr-only, not shown in the expansion
+      });
       process.stderr.write(`[cursor-agent] done (${res.stopReason})\n`);
-      return JSON.stringify({ text: res.text, stop_reason: res.stopReason, events });
+
+      const lines = [];
+      if (log.length) lines.push('--- activity ---', ...log, '--- response ---');
+      lines.push(res.text);
+      lines.push(`\n[stop_reason: ${res.stopReason}]`);
+      return lines.join('\n');
     }
 
     case 'cursor_task_submit': {
