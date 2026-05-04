@@ -108,9 +108,13 @@ class ACPClient {
     // Serialize sessions — ACP session/update notifications aren't tagged by
     // session ID in the current protocol, so we run one at a time to avoid
     // mixing output chunks from concurrent sessions.
-    return (this._sessionLock = this._sessionLock.then(() =>
-      this._runSessionInternal(prompt, cwd, timeoutMs, onUpdate)
-    ));
+    // Use .catch(() => {}) so a failed/timed-out session doesn't permanently
+    // block the lock chain.
+    const next = this._sessionLock
+      .catch(() => {})
+      .then(() => this._runSessionInternal(prompt, cwd, timeoutMs, onUpdate));
+    this._sessionLock = next.catch(() => {});
+    return next;
   }
 
   async _runSessionInternal(prompt, cwd, timeoutMs = 300000, onUpdate) {
