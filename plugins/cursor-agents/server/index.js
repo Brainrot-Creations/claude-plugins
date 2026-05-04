@@ -328,20 +328,34 @@ async function handleMcp(msg) {
   if (!msg.id) return;
 
   switch (msg.method) {
-    case 'initialize':
+    case 'initialize': {
+      const clientVersion = msg.params?.protocolVersion || '2024-11-05';
       mcpSend({
         jsonrpc: '2.0',
         id: msg.id,
         result: {
-          protocolVersion: '2024-11-05',
+          protocolVersion: clientVersion,
           capabilities: { tools: {} },
           serverInfo: { name: 'cursor-agents', version: '1.0.0' },
         },
       });
       break;
+    }
+
+    case 'ping':
+      mcpSend({ jsonrpc: '2.0', id: msg.id, result: {} });
+      break;
 
     case 'tools/list':
       mcpSend({ jsonrpc: '2.0', id: msg.id, result: { tools: TOOLS } });
+      break;
+
+    case 'resources/list':
+      mcpSend({ jsonrpc: '2.0', id: msg.id, result: { resources: [] } });
+      break;
+
+    case 'prompts/list':
+      mcpSend({ jsonrpc: '2.0', id: msg.id, result: { prompts: [] } });
       break;
 
     case 'tools/call': {
