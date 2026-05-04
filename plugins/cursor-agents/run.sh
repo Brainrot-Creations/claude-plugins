@@ -3,7 +3,32 @@ set -euo pipefail
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-: "${CURSOR_AGENT_PATH:=$(command -v agent 2>/dev/null || true)}"
+resolve_agent() {
+  local bin
+  # 1. Already set in environment
+  [[ -n "${CURSOR_AGENT_PATH:-}" ]] && { printf '%s' "$CURSOR_AGENT_PATH"; return 0; }
+  # 2. On PATH
+  bin="$(command -v agent 2>/dev/null || true)"
+  [[ -n "$bin" ]] && { printf '%s' "$bin"; return 0; }
+  # 3. Standard Cursor install locations (most common first)
+  local candidates=(
+    "$HOME/.local/bin/agent"
+    "/usr/local/bin/agent"
+    "/opt/homebrew/bin/agent"
+    "/snap/bin/agent"
+    "/usr/bin/agent"
+  )
+  for c in "${candidates[@]}"; do
+    [[ -x "$c" ]] && { printf '%s' "$c"; return 0; }
+  done
+  return 1
+}
+
+CURSOR_AGENT_PATH="$(resolve_agent || true)"
+if [[ -z "${CURSOR_AGENT_PATH:-}" ]]; then
+  echo "[cursor-agents] 'agent' not found. Install the Cursor CLI or set CURSOR_AGENT_PATH." >&2
+  exit 1
+fi
 export CURSOR_AGENT_PATH
 
 # Resolve node: prefer PATH, then NVM under $HOME (no hardcoded profile paths).
