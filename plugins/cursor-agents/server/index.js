@@ -325,7 +325,7 @@ function mcpSend(obj) {
 }
 
 async function handleMcp(msg) {
-  if (!msg.id) return;
+  if (msg.id === undefined || msg.id === null) return;
 
   switch (msg.method) {
     case 'initialize': {
