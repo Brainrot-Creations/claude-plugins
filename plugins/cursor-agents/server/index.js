@@ -102,18 +102,18 @@ class ACPClient {
     });
   }
 
-  async runSession(prompt, cwd, timeoutMs) {
+  async runSession(prompt, cwd, timeoutMs, onUpdate) {
     if (!this.connected) await this.connect();
 
     // Serialize sessions — ACP session/update notifications aren't tagged by
     // session ID in the current protocol, so we run one at a time to avoid
     // mixing output chunks from concurrent sessions.
     return (this._sessionLock = this._sessionLock.then(() =>
-      this._runSessionInternal(prompt, cwd, timeoutMs)
+      this._runSessionInternal(prompt, cwd, timeoutMs, onUpdate)
     ));
   }
 
-  async _runSessionInternal(prompt, cwd, timeoutMs = 300000) {
+  async _runSessionInternal(prompt, cwd, timeoutMs = 300000, onUpdate) {
     const { sessionId } = await this._rpc('session/new', {
       cwd: cwd || process.cwd(),
       mcpServers: [],
@@ -122,8 +122,23 @@ class ACPClient {
     const chunks = [];
     const unsub = this.on('session/update', (msg) => {
       const u = msg.params?.update;
-      if (u?.sessionUpdate === 'agent_message_chunk' && u.content?.text) {
+      if (!u) return;
+
+      if (u.sessionUpdate === 'agent_message_chunk' && u.content?.text) {
         chunks.push(u.content.text);
+        process.stderr.write(u.content.text);
+        onUpdate?.({ type: 'text', text: u.content.text });
+      } else if (u.sessionUpdate === 'tool_call') {
+        const label = `\n[tool_call] ${u.name || u.toolName || 'unknown'}(${JSON.stringify(u.input ?? u.arguments ?? {})})\n`;
+        process.stderr.write(label);
+        onUpdate?.({ type: 'tool_call', name: u.name || u.toolName, input: u.input ?? u.arguments });
+      } else if (u.sessionUpdate === 'tool_result') {
+        const label = `[tool_result] ${JSON.stringify(u.output ?? u.content ?? u.result)}\n`;
+        process.stderr.write(label);
+        onUpdate?.({ type: 'tool_result', output: u.output ?? u.content ?? u.result });
+      } else if (u.sessionUpdate === 'status' && u.status) {
+        process.stderr.write(`[status] ${u.status}\n`);
+        onUpdate?.({ type: 'status', status: u.status });
       }
     });
 
@@ -268,8 +283,11 @@ const TOOLS = [
 async function callTool(name, args) {
   switch (name) {
     case 'cursor_run': {
-      const res = await acp.runSession(args.prompt, args.cwd, args.timeout_ms);
-      return JSON.stringify({ text: res.text, stop_reason: res.stopReason });
+      const events = [];
+      process.stderr.write('[cursor-agent] starting session\n');
+      const res = await acp.runSession(args.prompt, args.cwd, args.timeout_ms, (e) => events.push(e));
+      process.stderr.write(`[cursor-agent] done (${res.stopReason})\n`);
+      return JSON.stringify({ text: res.text, stop_reason: res.stopReason, events });
     }
 
     case 'cursor_task_submit': {
