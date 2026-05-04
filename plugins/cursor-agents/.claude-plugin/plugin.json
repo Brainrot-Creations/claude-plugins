@@ -1,0 +1,8 @@
+{
+  "name": "cursor-agents",
+  "description": "Delegate tasks to Cursor agents from Claude. Spawn Cursor sub-agents for coding tasks, run them synchronously or in the background, and track their output.",
+  "author": {
+    "name": "Brainrot Creations",
+    "email": "support@brainrotcreations.com"
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "cursor-agents": {
+      "command": "/bin/bash",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/run.sh"]
+    }
+  }
+}

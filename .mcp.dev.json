@@ -10,6 +10,10 @@
     "hive": {
       "type": "http",
       "url": "http://localhost:3000/mcp"
+    },
+    "cursor-agents": {
+      "command": "/bin/bash",
+      "args": ["plugins/cursor-agents/run.sh"]
     }
   }
 }

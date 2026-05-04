@@ -27,6 +27,13 @@
       "source": "./plugins/agent-browser",
       "category": "developer-tools",
       "homepage": "https://github.com/Brainrot-Creations/agent-browser"
+    },
+    {
+      "name": "cursor-agents",
+      "description": "Delegate tasks to Cursor agents from Claude. Spawn Cursor sub-agents for coding tasks, run them synchronously or in the background, and track their output.",
+      "source": "./plugins/cursor-agents",
+      "category": "developer-tools",
+      "homepage": "https://github.com/Brainrot-Creations/cursor-agents"
     }
   ]
 }

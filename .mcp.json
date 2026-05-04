@@ -6,6 +6,10 @@
       "env": {
         "SOCIALS_MCP_RECLAIM_PORT": "1"
       }
+    },
+    "cursor-agents": {
+      "command": "/bin/bash",
+      "args": ["plugins/cursor-agents/run.sh"]
     }
   }
 }
