@@ -63,6 +63,13 @@
       "source": "./plugins/openai",
       "category": "external-integrations",
       "homepage": "https://platform.openai.com/docs"
+    },
+    {
+      "name": "partiful",
+      "description": "Partiful event discovery — explore city feeds (NYC, LA, SF, BOS, DC, CHI, LON, MIA, ATX), fetch event details, and look up user profiles. No API key required.",
+      "source": "./plugins/partiful",
+      "category": "external-integrations",
+      "homepage": "https://partiful.com"
     }
   ]
 }
