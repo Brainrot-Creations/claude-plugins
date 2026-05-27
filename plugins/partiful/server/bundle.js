@@ -21130,6 +21130,30 @@ function asText(payload) {
 }
 var server = new McpServer({ name: "partiful-api", version: "1.0.0" });
 server.tool(
+  "partiful_events_feed",
+  "Fetch paginated events for a city region via Partiful's API. Supports tag filtering (MUSIC, ARTS, FITNESS, FOOD, COMMUNITY) and cursor pagination.",
+  {
+    region: external_exports.enum(["nyc", "la", "sf", "bos", "dc", "chi", "lon", "mia", "atx"]),
+    tag: external_exports.string().optional(),
+    limit: external_exports.number().int().positive().max(100).optional(),
+    cursor: external_exports.string().optional(),
+    timeout: external_exports.number().int().positive().max(120).optional()
+  },
+  async ({ region, tag, limit, cursor, timeout }) => {
+    try {
+      const q = { region };
+      if (tag) q.tag = tag;
+      if (limit) q.limit = limit;
+      if (cursor) q.cursor = cursor;
+      if (timeout) q.timeout = timeout;
+      const data = await partifulGet("/api/partiful/events/feed", q);
+      return asText(data);
+    } catch (e) {
+      return asText({ ok: false, error: String(e) });
+    }
+  }
+);
+server.tool(
   "partiful_explore",
   "Fetch the Partiful explore feed for a city region: curated events, sections, tags, and event counts across all regions.",
   {
