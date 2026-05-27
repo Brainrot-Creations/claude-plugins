@@ -9,7 +9,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 
 /** Used when no `AMC_API_URL` / `API_SERVER_URL` / `API_SERVER_HOST` is set. */
-const DEFAULT_AMC_PROXY_BASE = "https://api.brainrotcreations.com";
+const DEFAULT_AMC_PROXY_BASE = "https://mcp.amc.shubhthorat.com";
 
 const CONFIG_DIR = join(homedir(), ".config", "amc-api");
 const CONFIG_PATH = join(CONFIG_DIR, "env.json");

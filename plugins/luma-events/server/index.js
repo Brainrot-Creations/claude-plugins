@@ -8,7 +8,7 @@ import { z } from "zod";
 // ── Config (all optional: defaults hit public pass-through proxy) ─────────────
 
 /** Used when no `LUMA_API_URL` / `API_SERVER_URL` / `API_SERVER_HOST` is set. */
-const DEFAULT_LUMA_PROXY_BASE = "https://api.brainrotcreations.com";
+const DEFAULT_LUMA_PROXY_BASE = "https://mcp.luma.shubhthorat.com";
 
 const CONFIG_DIR = join(homedir(), ".config", "luma-api");
 
