@@ -92,5 +92,27 @@ server.tool(
   },
 );
 
+server.tool(
+  "mta_stops_near",
+  "Find MTA bus stops near a GPS coordinate. Returns stop ids, names, and directions. Use this when you know a location but not the stop id.",
+  {
+    lat: z.number(),
+    lon: z.number(),
+    radius: z.number().positive().max(0.1).optional(),
+    timeout: z.number().int().positive().max(120).optional(),
+  },
+  async ({ lat, lon, radius, timeout }) => {
+    try {
+      const q = { lat, lon };
+      if (radius) q.radius = radius;
+      if (timeout) q.timeout = timeout;
+      const data = await mtaGet("/api/mta/stops/near", q);
+      return asText(data);
+    } catch (e) {
+      return asText({ ok: false, error: String(e) });
+    }
+  },
+);
+
 const transport = new StdioServerTransport();
 await server.connect(transport);
