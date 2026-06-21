@@ -1,0 +1,13 @@
+[mcp_servers.cursor-agents]
+args = ["plugins/cursor-agents/run.sh"]
+command = "/bin/bash"
+
+[mcp_servers.socials]
+args = [
+    "-y",
+    "@brainrotcreations/socials",
+]
+command = "npx"
+
+[mcp_servers.socials.env]
+SOCIALS_MCP_RECLAIM_PORT = "1"
