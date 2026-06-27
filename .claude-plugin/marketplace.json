@@ -41,7 +41,8 @@
       "description": "Luma Discover + events + calendar MCP \u2014 browse events near you, by place, category, or calendar. Powered by api.brainrotcreations.com.",
       "source": "./plugins/luma-events",
       "category": "external-integrations",
-      "homepage": "https://luma.com"
+      "homepage": "https://luma.com",
+      "disabled": true
     },
     {
       "name": "amc-theatres",
