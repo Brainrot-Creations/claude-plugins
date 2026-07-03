@@ -1,7 +1,7 @@
 {
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
   "name": "brainrot-creations",
-  "description": "Official Brainrot Creations plugins for Claude Code \u2014 social media automation and collective browser intelligence",
+  "description": "Official Brainrot Creations plugins for Claude Code — social media automation and collective browser intelligence",
   "owner": {
     "name": "Brainrot Creations",
     "email": "support@brainrotcreations.com"
@@ -38,7 +38,7 @@
     },
     {
       "name": "luma-events",
-      "description": "Luma Discover + events + calendar MCP \u2014 browse events near you, by place, category, or calendar. Powered by api.brainrotcreations.com.",
+      "description": "Luma Discover + events + calendar MCP — browse events near you, by place, category, or calendar. Powered by api.brainrotcreations.com.",
       "source": "./plugins/luma-events",
       "category": "external-integrations",
       "homepage": "https://luma.com",
@@ -46,7 +46,7 @@
     },
     {
       "name": "amc-theatres",
-      "description": "AMC theatres, showtimes, and seat maps \u2014 find theatres by zip, browse showtimes, and pull live seat availability. Pass X-Amc-Cookie for gated routes.",
+      "description": "AMC theatres, showtimes, and seat maps — find theatres by zip, browse showtimes, and pull live seat availability. Pass X-Amc-Cookie for gated routes.",
       "source": "./plugins/amc-theatres",
       "category": "external-integrations",
       "homepage": "https://www.amctheatres.com"
@@ -60,24 +60,31 @@
     },
     {
       "name": "openai",
-      "description": "OpenAI API plugin \u2014 chat completions (GPT-4o, o1, o3-mini) and DALL-E image generation. Requires OPENAI_API_KEY.",
+      "description": "OpenAI API plugin — chat completions (GPT-4o, o1, o3-mini) and DALL-E image generation. Requires OPENAI_API_KEY.",
       "source": "./plugins/openai",
       "category": "external-integrations",
       "homepage": "https://platform.openai.com/docs"
     },
     {
       "name": "partiful",
-      "description": "Partiful event discovery \u2014 explore city feeds (NYC, LA, SF, BOS, DC, CHI, LON, MIA, ATX), fetch event details, and look up user profiles. No API key required.",
+      "description": "Partiful event discovery — explore city feeds (NYC, LA, SF, BOS, DC, CHI, LON, MIA, ATX), fetch event details, and look up user profiles. No API key required.",
       "source": "./plugins/partiful",
       "category": "external-integrations",
       "homepage": "https://partiful.com"
     },
     {
       "name": "mta",
-      "description": "MTA BusTime \u2014 real-time NYC bus arrivals at any stop, live vehicle positions on a route, and stop listings. No API key required.",
+      "description": "MTA BusTime — real-time NYC bus arrivals at any stop, live vehicle positions on a route, and stop listings. No API key required.",
       "source": "./plugins/mta",
       "category": "external-integrations",
       "homepage": "https://bustime.mta.info"
+    },
+    {
+      "name": "hermes-tweet",
+      "description": "Hermes Agent plugin for X/Twitter research, profile and post reads, and gated write actions through Xquik.",
+      "source": "./plugins/hermes-tweet",
+      "category": "external-integrations",
+      "homepage": "https://github.com/Xquik-dev/hermes-tweet"
     }
   ]
 }

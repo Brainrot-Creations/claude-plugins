@@ -24,6 +24,7 @@ Then install individual plugins:
 ```
 /plugin install amc-theatres@brainrot-creations
 /plugin install socials@brainrot-creations
+/plugin install hermes-tweet@brainrot-creations
 /plugin install agent-browser@brainrot-creations
 /plugin install cursor-agents@brainrot-creations
 /plugin install codex@brainrot-creations
@@ -57,6 +58,12 @@ Search AMC theatres, get showtimes, and view real-time seat maps. No auth requir
 Connect Claude to X, LinkedIn, and Reddit via the Socials browser extension. Post, engage, search, and manage social media directly from Claude Code.
 
 **Install:** `/plugin install socials@brainrot-creations`
+
+### [Hermes Tweet](./plugins/hermes-tweet)
+
+Hermes Agent plugin for X/Twitter research, profile reads, post reads, and gated write actions via Xquik. `tweet_explore` works without a key; read tools require `XQUIK_API_KEY`, and action tools also require `HERMES_TWEET_ENABLE_ACTIONS=true`.
+
+**Install:** `/plugin install hermes-tweet@brainrot-creations`
 
 ### [Codex](./plugins/codex)
 
